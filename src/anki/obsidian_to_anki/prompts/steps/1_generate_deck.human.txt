@@ -1,0 +1,12 @@
+Article:
+
+{article}
+
+Task:
+- Generate a comprehensive set of high-quality, ready-to-use Anki cards directly from the article.
+- Ensure each card is self-contained and includes just enough context to stand alone.
+- Prefer atomic prompts; avoid overlapping or duplicate questions.
+- If a simple ASCII sketch clarifies a complex idea, include it.
+
+Unified rules to follow:
+{{ANKI_RULES}}

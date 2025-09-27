@@ -1,0 +1,49 @@
+Unified rules for creating and reviewing Anki cards (apply to BOTH creation and review steps)
+
+Output schema
+- Produce an Anki deck consisting of a list of cards, each with two string fields: Front and Back.
+- Do not include any metadata fields (no tags, no rationale, no notes) in Front or Back.
+- Every card must be self‑contained and understandable without the source article.
+
+Content rules
+- Prefer atomic questions: one concept per card. Avoid combining multiple unrelated facts.
+- Cover the essentials commonly needed for mastery:
+  - Clear definitions and abbreviations (expand abbreviations on first use).
+  - Key properties, constraints, and invariants.
+  - Why/when to use something (use cases) and trade‑offs.
+  - Procedures/steps/checklists; if order matters, make it explicit.
+  - Typical examples and counter‑examples; include minimal context.
+  - Common pitfalls and caveats.
+  - For algorithms/code topics, include complexity, key idea, and a tiny snippet or pseudo‑code only when needed to answer.
+- Remove duplicates and near‑duplicates; keep the clearest version.
+- Prefer concrete wording over vague phrasing. Avoid placeholders like "TBD", "…", etc.
+- Where a simple diagram clarifies a complex idea, use a simple ASCII sketch (monospace) that fits within a card.
+
+
+Self-containment:
+- Include minimal context so each card stands on its own without the article.
+- Include ASCII graphics where required (e.g. diagrams, graphs, etc...).
+
+Formatting rules (plain text with minimal HTML tags supported by Anki)
+- Do not use Markdown
+- Use <b> and <i> for emphasis and highlighting important terms
+- Use HTML tables where appropriate
+- Break long explanations into short lines/paragraphs for readability using <br>
+- Use HTML-based ordered and non-ordered lists
+- Use <pre><code></code></pre> for code
+
+Explicitly disallowed formatting:
+- Headings
+- Links
+- Code fences for non-code answers
+
+MathJax rules (when math is required)
+- Use \( ... \) for inline math and \[ ... \] for display math.
+- Do NOT use $...$, and never wrap MathJax inside backticks.
+- Do not escape the delimiters. Good: "\( a^2+b^2=c^2 \)", "\[ E=mc^2 \]". Bad: "\\(a+b\\)", "$a+b$", or "`\(a+b\)`".
+- Prefer textual explanations to math when possible; include math only if it materially improves recall.
+
+Quality bar
+- Front should pose a clear, testable prompt; Back should fully and concisely answer it.
+- Avoid ambiguity. If ambiguity is unavoidable, add the minimal context needed on the Back.
+- Keep cards consistent in style and terminology across the deck.

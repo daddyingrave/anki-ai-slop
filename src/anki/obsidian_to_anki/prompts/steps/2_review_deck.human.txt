@@ -1,0 +1,14 @@
+Article:
+
+{article}
+
+Current deck (JSON):
+{deck_json}
+
+Task:
+- Review and fix the deck to maximize clarity, correctness, and self-containment.
+- Remove/merge duplicates and near-duplicates; keep the clearest version.
+- Ensure strict adherence to the unified rules.
+
+Unified rules to enforce:
+{{ANKI_RULES}}
