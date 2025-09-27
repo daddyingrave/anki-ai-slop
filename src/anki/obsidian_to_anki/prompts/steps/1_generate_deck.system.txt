@@ -4,6 +4,9 @@ Task:
 - Read the provided article and produce a ready-to-use Anki deck (Front/Back fields only).
 - Make cards self-contained, correct, and concise.
 - Avoid duplicates and near-duplicates.
+- Ensure comprehensive coverage across the article’s major sections and any code examples.
+- Adhere to the source’s definitions and conventions when they diverge from standard ones.
+- Do not use backticks (`) or Markdown; if code is necessary, use minimal HTML (<code>...</code> or <pre><code>...</code></pre>) and MathJax \( \)/\[ \] only.
 
 Unified rules (apply fully):
 {{ANKI_RULES}}

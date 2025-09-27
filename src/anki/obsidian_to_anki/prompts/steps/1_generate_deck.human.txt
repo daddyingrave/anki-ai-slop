@@ -7,6 +7,9 @@ Task:
 - Ensure each card is self-contained and includes just enough context to stand alone.
 - Prefer atomic prompts; avoid overlapping or duplicate questions.
 - If a simple ASCII sketch clarifies a complex idea, include it.
+- Silently derive a coverage checklist from the article (major sections, key concepts, and any code blocks). Ensure at least one high-value card per checklist item. Do not output the checklist.
+- Absolutely do not use backticks or Markdown; if minimal code is needed, use <code>inline</code> or <pre><code>block</code></pre> and MathJax \( \)/\[ \] only.
+- Do not include questions related to code listings
 
 Unified rules to follow:
 {{ANKI_RULES}}

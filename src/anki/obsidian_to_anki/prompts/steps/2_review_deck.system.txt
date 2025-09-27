@@ -4,6 +4,9 @@ Goals:
 - Improve clarity, correctness, and self-containment of each card.
 - Remove or merge duplicates and near-duplicates.
 - Ensure the deck adheres strictly to all rules and is immediately usable.
+- Verify coverage across the article’s major sections; add missing high-value cards if needed.
+- Ensure alignment with the source’s definitions and conventions.
+- Remove any backticks and Markdown; convert inline code to <code>…</code> and fenced code blocks to <pre><code>…</code></pre>. Use MathJax \( \)/\[ \] only for math.
 
 Unified rules (apply fully):
 {{ANKI_RULES}}

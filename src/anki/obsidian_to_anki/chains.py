@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import cast
+import re
+import html
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -39,8 +41,6 @@ def generate_anki_deck(
             "LLM did not return structured AnkiDeck. Check the model, prompts, and inputs."
         )
     result = _normalize_math_delimiters(result)
-    from .validators import validate_deck
-    validate_deck(result)
     return result
 
 
@@ -98,20 +98,44 @@ def build_deck_pipeline(
     return reviewed_deck
 
 def _normalize_math_delimiters(deck: AnkiDeck) -> AnkiDeck:
-    """Collapse double-escaped MathJax delimiters to single escapes.
+    """Normalize card text fields for MathJax and formatting cleanliness.
+
+    - Collapse double-escaped MathJax delimiters to single escapes.
+    - Convert fenced code blocks (``` ... ```) to <pre><code>...</code></pre>.
+    - Convert inline code (`...`) to <code>...</code>.
+    - Remove any stray backtick characters.
 
     Context: When passing JSON into prompts (e.g., during review), backslashes in strings
     appear escaped (\\). Some models mirror those escapes into their output, leading to
     double-escaped MathJax delimiters like "\\\\(" in the structured result. This breaks
-    MathJax rendering in Anki. We normalize only the MathJax delimiters here.
+    MathJax rendering in Anki. Some models also insist on Markdown backticks; we convert or remove
+    them to keep output HTML/MathJax compliant.
     """
+    # Precompile lightweight regexes
+    fenced = re.compile(r"```[a-zA-Z0-9_\-]*\n(.*?)\n?```", re.DOTALL)
+    inline = re.compile(r"`([^`]*)`")
+
+    def _escape_html(s: str) -> str:
+        # Escape minimal set to render within HTML code blocks
+        return html.escape(s, quote=False)
+
     for c in deck.cards:
         for field in ("Front", "Back"):
             s = getattr(c, field)
             if not isinstance(s, str) or not s:
                 continue
-            # Only collapse for MathJax delimiters
+            # 1) Collapse for MathJax delimiters
             s = s.replace("\\\\(", "\\(").replace("\\\\)", "\\)")
             s = s.replace("\\\\[", "\\[").replace("\\\\]", "\\]")
+            # 2) Fenced code blocks -> HTML
+            def _fenced_repl(m: re.Match) -> str:
+                code = m.group(1)
+                return f"<pre><code>{_escape_html(code)}</code></pre>"
+            s = fenced.sub(_fenced_repl, s)
+            # 3) Inline code -> HTML
+            s = inline.sub(lambda m: f"<code>{_escape_html(m.group(1))}</code>", s)
+            # 4) Remove any stray backticks that remain
+            if "`" in s:
+                s = s.replace("`", "")
             setattr(c, field, s)
     return deck

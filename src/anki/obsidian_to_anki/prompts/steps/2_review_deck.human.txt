@@ -9,6 +9,10 @@ Task:
 - Review and fix the deck to maximize clarity, correctness, and self-containment.
 - Remove/merge duplicates and near-duplicates; keep the clearest version.
 - Ensure strict adherence to the unified rules.
+- Cross-check coverage against the article’s major sections. If gaps exist (e.g., missing pitfalls, complexities), add or revise cards to close them.
+- Ensure claims match the source’s conventions (do not “correct” the source to standard definitions unless the source itself says so).
+- Eliminate any backticks or Markdown remnants; convert inline code to <code>…</code> and fenced code to <pre><code>…</code></pre>. Use MathJax \( \)/\[ \] only for math.
+- Eliminate any questions related to code listings
 
 Unified rules to enforce:
 {{ANKI_RULES}}

@@ -8,13 +8,13 @@ pipelines:
 
     generate:
       model: models/gemini-2.5-flash
-      temperature: 0.1
+      temperature: 0.4
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
     review:
       model: models/gemini-2.5-pro
-      temperature: 0.1
+      temperature: 0.0
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0

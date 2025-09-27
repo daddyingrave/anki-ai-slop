@@ -7,6 +7,7 @@ Output schema
 
 Content rules
 - Prefer atomic questions: one concept per card. Avoid combining multiple unrelated facts.
+- Ensure coverage across the source: extract the major topics/sections and include at least one high‑value card per major section.
 - Cover the essentials commonly needed for mastery:
   - Clear definitions and abbreviations (expand abbreviations on first use).
   - Key properties, constraints, and invariants.
@@ -15,9 +16,11 @@ Content rules
   - Typical examples and counter‑examples; include minimal context.
   - Common pitfalls and caveats.
   - For algorithms/code topics, include complexity, key idea, and a tiny snippet or pseudo‑code only when needed to answer.
+  - When the source includes code, add 2–3 precise code‑aware cards (e.g., boundary conditions, visited‑set handling, off‑by‑one, typical bug patterns) tied to the given code.
 - Remove duplicates and near‑duplicates; keep the clearest version.
 - Prefer concrete wording over vague phrasing. Avoid placeholders like "TBD", "…", etc.
 - Where a simple diagram clarifies a complex idea, use a simple ASCII sketch (monospace) that fits within a card.
+- Do not invent or change definitions; resolve ambiguities by following the source’s phrasing. If the source uses a nonstandard convention, mirror it and, if helpful, note that it is per the source.
 
 
 Self-containment:
@@ -36,6 +39,7 @@ Explicitly disallowed formatting:
 - Headings
 - Links
 - Code fences for non-code answers
+- NEVER USE backticks
 
 MathJax rules (when math is required)
 - Use \( ... \) for inline math and \[ ... \] for display math.
