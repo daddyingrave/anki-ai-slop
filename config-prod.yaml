@@ -4,7 +4,7 @@ pipelines:
   obsidian_to_anki:
     # Discovery
     vault_dir: /Users/daddyingrave/Documents/default
-    notes_path: Clippings/2025-09-27T12-20-40 Learning Center.md
+    notes_path: Learn/Algorithms/Neetcode.io/Intro to Graphs.md
 
     generate:
       model: models/gemini-2.5-flash
