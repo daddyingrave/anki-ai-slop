@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Set
 
-from .models import AnkiDeck
+from anki.pipelines.obsidian.models import AnkiDeck
 
 
 _MATH_FORBIDDEN = [

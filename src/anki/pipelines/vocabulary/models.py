@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
-from ..anki_sync.anki_connect import anki_id
+from anki.anki_sync.anki_connect import anki_id
 
 
 class Translation(BaseModel):

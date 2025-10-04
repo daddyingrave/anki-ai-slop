@@ -10,12 +10,12 @@ from typing import Optional
 import yaml
 from pydantic import ValidationError
 
-from .anki_sync.anki_connect import anki_id, sync_anki_cards
-from .common.observability import enable_cache
-from .config_models import RunConfig, ObsidianToAnkiPipelineConfig, LemmatizerToAnkiPipelineConfig
-from .obsidian_to_anki.chains import build_obsidian_pipeline
-from .lemmatizer_to_anki.chains import build_vocabulary_pipeline
-from .lemmatizer_to_anki.models import vocabulary_card_to_note
+from anki.anki_sync.anki_connect import anki_id, sync_anki_cards
+from anki.common.observability import enable_cache
+from anki.config_models import RunConfig, ObsidianToAnkiPipelineConfig, LemmatizerToAnkiPipelineConfig
+from anki.pipelines.obsidian.chains import build_obsidian_pipeline
+from anki.pipelines.vocabulary.chains import build_vocabulary_pipeline
+from anki.pipelines.vocabulary.models import vocabulary_card_to_note
 
 
 def _require_google_key() -> None:

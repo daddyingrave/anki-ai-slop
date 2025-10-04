@@ -24,7 +24,7 @@ sync_anki_cards(deck_name="My Deck", note_type="Basic", cards=cards)
 
 Notes:
 - This module uses only stdlib (urllib) to talk to AnkiConnect.
-- It does NOT depend on existing obsidian_to_anki models.
+- It does NOT depend on existing pipeline models.
 """
 from __future__ import annotations
 

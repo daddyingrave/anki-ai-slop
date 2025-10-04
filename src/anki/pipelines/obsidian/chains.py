@@ -6,11 +6,11 @@ from typing import cast
 
 from langchain_core.prompts import ChatPromptTemplate
 
-from .models import AnkiDeck
-from .prompts import build_step
-from ..common.llm import build_llm
-from ..common.reliability import retry_invoke
-from ..config_models import StepConfig, ObsidianToAnkiPipelineConfig
+from anki.pipelines.obsidian.models import AnkiDeck
+from anki.pipelines.obsidian.prompts import build_step
+from anki.common.llm import build_llm
+from anki.common.reliability import retry_invoke
+from anki.config_models import StepConfig, ObsidianPipelineConfig
 
 
 def generate_anki_deck(
@@ -76,7 +76,7 @@ def review_anki_deck(
             "LLM did not return structured AnkiDeck during review. Check the model, prompts, and inputs."
         )
     result = _normalize_math_delimiters(result)
-    from .validators import validate_deck
+    from anki.pipelines.obsidian.validators import validate_deck
     validate_deck(result)
     return result
 
@@ -84,7 +84,7 @@ def review_anki_deck(
 def build_obsidian_pipeline(
         vault_dir: str,
         notes_path: str,
-        pipeline_cfg: ObsidianToAnkiPipelineConfig,
+        pipeline_cfg: ObsidianPipelineConfig,
 ) -> list[tuple[str, AnkiDeck]]:
     """Complete pipeline to process Obsidian notes and generate Anki decks.
 
@@ -96,7 +96,7 @@ def build_obsidian_pipeline(
     Args:
         vault_dir: Path to the Obsidian vault directory
         notes_path: Path to notes (file or directory) relative to vault_dir
-        pipeline_cfg: Pipeline configuration for obsidian_to_anki
+        pipeline_cfg: Pipeline configuration for obsidian pipeline
 
     Returns:
         List of tuples containing (deck_name, AnkiDeck)

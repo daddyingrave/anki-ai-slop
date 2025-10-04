@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import time
 
-from .observability import get_default_callbacks
+from anki.common.observability import get_default_callbacks
 
 
 def retry_invoke(chain, inputs: dict, *, max_retries: int, backoff_initial_seconds: float, backoff_multiplier: float):

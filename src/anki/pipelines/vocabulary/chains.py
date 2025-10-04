@@ -9,11 +9,11 @@ from typing import Dict, List, cast
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from .models import VocabularyCard, VocabularyDeck, Translation
-from .prompts import build_translation_prompts, build_word_translation_prompts
-from ..common.llm import build_llm
-from ..common.reliability import retry_invoke
-from ..config_models import StepConfig
+from anki.pipelines.vocabulary.models import VocabularyCard, VocabularyDeck, Translation
+from anki.pipelines.vocabulary.prompts import build_translation_prompts, build_word_translation_prompts
+from anki.common.llm import build_llm
+from anki.common.reliability import retry_invoke
+from anki.config_models import StepConfig
 
 
 class ContextTranslationResponse(BaseModel):
@@ -264,7 +264,7 @@ def build_vocabulary_pipeline(
     Returns:
         List of VocabularyCard objects
     """
-    from ..lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
+    from anki.lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
 
     # Step 1: Extract lemmas using the lemmatizer
     print(f"Processing file with lemmatizer: {input_file}")

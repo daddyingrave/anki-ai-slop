@@ -14,7 +14,7 @@ class StepConfig(BaseModel):
     backoff_multiplier: float = Field(default=2.0, gt=1.0, description="Exponential backoff multiplier")
 
 
-class ObsidianToAnkiPipelineConfig(BaseModel):
+class ObsidianPipelineConfig(BaseModel):
     """Configuration for the Obsidian → Anki pipeline.
 
     - vault_dir: absolute path to the Obsidian vault on the local filesystem
@@ -31,8 +31,8 @@ class ObsidianToAnkiPipelineConfig(BaseModel):
     review: StepConfig
 
 
-class LemmatizerToAnkiPipelineConfig(BaseModel):
-    """Configuration for the Lemmatizer → Anki pipeline.
+class VocabularyPipelineConfig(BaseModel):
+    """Configuration for the Vocabulary pipeline (formerly Lemmatizer → Anki).
 
     - input_file: path to the text file to process
     - language: language mnemonic for lemmatization (e.g., EN, DE, FR)
@@ -53,6 +53,11 @@ class LemmatizerToAnkiPipelineConfig(BaseModel):
     translate: StepConfig
 
 
+# Backwards compatibility aliases
+ObsidianToAnkiPipelineConfig = ObsidianPipelineConfig
+LemmatizerToAnkiPipelineConfig = VocabularyPipelineConfig
+
+
 class RunConfig(BaseModel):
     """Top-level run configuration (new schema only).
 
@@ -60,6 +65,6 @@ class RunConfig(BaseModel):
     """
 
     # Structured pipelines (required to run)
-    pipelines: Dict[str, ObsidianToAnkiPipelineConfig | LemmatizerToAnkiPipelineConfig] | None = Field(
+    pipelines: Dict[str, ObsidianPipelineConfig | VocabularyPipelineConfig] | None = Field(
         default=None, description="Pipelines configuration keyed by pipeline id"
     )
