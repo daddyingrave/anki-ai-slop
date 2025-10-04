@@ -12,8 +12,6 @@ from pydantic import BaseModel, Field
 
 from anki.pipelines.vocabulary.models import VocabularyCard, VocabularyDeck, Translation
 from anki.pipelines.vocabulary.prompts import (
-    build_translation_prompts,
-    build_word_translation_prompts,
     build_batch_translation_prompts,
     build_batch_word_translation_prompts,
 )
@@ -189,98 +187,6 @@ def highlight_word_in_context(word: str, context: str) -> str:
     return highlighted
 
 
-def translate_word_in_context(
-        word: str,
-        original_word: str,
-        context: str,
-        part_of_speech: str,
-        step: StepConfig,
-) -> ContextTranslationResponse:
-    """Translate a word considering its context.
-
-    Args:
-        word: The lemma (base form) to translate
-        original_word: The word as it appears in the sentence
-        context: The sentence containing the word
-        part_of_speech: Part of speech tag
-        step: Step configuration (model, temperature, retries, etc.)
-
-    Returns:
-        Translations for Russian and Spanish with context
-    """
-    llm = build_llm(model=step.model, temperature=step.temperature)
-
-    prompts = build_translation_prompts()
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", prompts["system"]),
-        ("human", prompts["human"]),
-    ])
-
-    chain = prompt | llm.with_structured_output(ContextTranslationResponse)
-    result = cast(ContextTranslationResponse, retry_invoke(
-        chain,
-        {
-            "word": word,
-            "original_word": original_word,
-            "context": context,
-            "part_of_speech": part_of_speech,
-        },
-        max_retries=step.max_retries,
-        backoff_initial_seconds=step.backoff_initial_seconds,
-        backoff_multiplier=step.backoff_multiplier,
-    ))
-
-    if result is None:
-        raise RuntimeError(f"LLM did not return translation for word '{word}'")
-
-    return result
-
-
-def translate_word_general(
-        word: str,
-        part_of_speech: str,
-        step: StepConfig,
-) -> WordTranslationResponse:
-    """Get general translations for a word (not context-specific).
-
-    Args:
-        word: The word to translate
-        part_of_speech: Part of speech tag
-        step: Step configuration
-
-    Returns:
-        Common translations for Russian and Spanish
-    """
-    # Skip translation for proper nouns
-    if part_of_speech.lower() == "proper noun":
-        return WordTranslationResponse(russian=[], spanish=[])
-
-    llm = build_llm(model=step.model, temperature=step.temperature)
-
-    prompts = build_word_translation_prompts()
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", prompts["system"]),
-        ("human", prompts["human"]),
-    ])
-
-    chain = prompt | llm.with_structured_output(WordTranslationResponse)
-    result = cast(WordTranslationResponse, retry_invoke(
-        chain,
-        {
-            "word": word,
-            "part_of_speech": part_of_speech,
-        },
-        max_retries=step.max_retries,
-        backoff_initial_seconds=step.backoff_initial_seconds,
-        backoff_multiplier=step.backoff_multiplier,
-    ))
-
-    if result is None:
-        raise RuntimeError(f"LLM did not return general translation for word '{word}'")
-
-    return result
-
-
 def batch_translate_words_general(
         words: Dict[str, WordInSentence],
         step: StepConfig,
@@ -392,107 +298,6 @@ def batch_translate_sentence_words(
     return result
 
 
-def generate_vocabulary_card(
-        lemma: str,
-        original_word: str,
-        context: str,
-        part_of_speech: str,
-        step: StepConfig,
-) -> VocabularyCard:
-    """Generate a complete vocabulary card for a lemma.
-
-    This performs two translation steps:
-    1. Context-aware translation of the word in the given sentence
-    2. General translations of the word (common meanings)
-
-    Args:
-        lemma: The base form of the word
-        original_word: The word as it appears in text
-        context: The sentence containing the word
-        part_of_speech: Part of speech tag
-        step: Step configuration
-
-    Returns:
-        A complete VocabularyCard with all translations
-    """
-    # Step 1: Get context-aware translation
-    ctx_translation = translate_word_in_context(
-        word=lemma,
-        original_word=original_word,
-        context=context,
-        part_of_speech=part_of_speech,
-        step=step,
-    )
-
-    # Step 2: Get general translations
-    general_translation = translate_word_general(
-        word=lemma,
-        part_of_speech=part_of_speech,
-        step=step,
-    )
-
-    # Create card ID
-    card_id = f"{lemma}/{part_of_speech}"
-
-    # Highlight the word in context
-    highlighted_context = highlight_word_in_context(original_word, context)
-
-    # Build the vocabulary card
-    card = VocabularyCard(
-        card_id=card_id,
-        english_lemma=lemma,
-        english_original_word=original_word,
-        english_context=highlighted_context,
-        part_of_speech=part_of_speech,
-        russian_word_translation=ctx_translation.russian.word_translation,
-        russian_context_translation=ctx_translation.russian.context_translation,
-        russian_common_translations=", ".join(general_translation.russian),
-        spanish_word_translation=ctx_translation.spanish.word_translation,
-        spanish_common_translations=", ".join(general_translation.spanish),
-    )
-
-    return card
-
-
-def process_lemma_batch(
-        lemma_entries: Dict[str, List[Dict[str, str]]],
-        step: StepConfig,
-) -> VocabularyDeck:
-    """Process a batch of lemma entries and generate vocabulary cards.
-
-    Args:
-        lemma_entries: Dictionary mapping lemmas to their entries
-            Each entry should have: sentence, original_word, part_of_speech
-        step: Step configuration
-
-    Returns:
-        A VocabularyDeck containing cards for all processed lemmas
-    """
-    cards: List[VocabularyCard] = []
-
-    for lemma, entries in lemma_entries.items():
-        if not entries:
-            continue
-
-        # Use the first entry for each lemma
-        first_entry = entries[0]
-
-        try:
-            card = generate_vocabulary_card(
-                lemma=lemma,
-                original_word=first_entry["original_word"],
-                context=first_entry["sentence"],
-                part_of_speech=first_entry["part_of_speech"],
-                step=step,
-            )
-            cards.append(card)
-        except Exception as e:
-            print(f"Error generating card for lemma '{lemma}': {e}")
-            continue
-
-    return VocabularyDeck(cards=cards)
-
-
 def build_vocabulary_pipeline(
         input_file: str,
         language: str,
@@ -574,42 +379,26 @@ def build_vocabulary_pipeline(
 
     # Step 5: Batch translate general meanings (ALL lemmas in ONE LLM call)
     print(f"Batch translating {len(all_unique_lemmas)} unique lemmas (general meanings)...")
+
+    batch_result = batch_translate_words_general(all_unique_lemmas, translate_step)
+
+    # Convert list of translations to dict: lemma -> WordTranslationResponse
     general_translations: Dict[str, WordTranslationResponse] = {}
+    for trans in batch_result.translations:
+        general_translations[trans.lemma] = WordTranslationResponse(
+            russian=trans.russian,
+            spanish=trans.spanish
+        )
 
-    try:
-        batch_result = batch_translate_words_general(all_unique_lemmas, translate_step)
+    print(f"  Success: Translated all {len(general_translations)} lemmas in 1 LLM call")
 
-        # Convert list of translations to dict: lemma -> WordTranslationResponse
-        for trans in batch_result.translations:
-            general_translations[trans.lemma] = WordTranslationResponse(
-                russian=trans.russian,
-                spanish=trans.spanish
-            )
-
-        print(f"  Success: Translated all {len(general_translations)} lemmas in 1 LLM call")
-
-        # Debug: Show sample translations
-        if general_translations:
-            sample_lemma = list(general_translations.keys())[0]
-            sample_trans = general_translations[sample_lemma]
-            print(f"  Sample: '{sample_lemma}' -> RU: {sample_trans.russian}, ES: {sample_trans.spanish}")
-        else:
-            print(f"  WARNING: Batch translation returned empty list!")
-
-    except Exception as e:
-        print(f"  Error in batch translation: {e}")
-        print(f"  Falling back to one-by-one translation...")
-        # Fallback: translate one by one if batch fails
-        for idx, (lemma, word) in enumerate(all_unique_lemmas.items(), 1):
-            try:
-                general_trans = translate_word_general(lemma, word.part_of_speech, translate_step)
-                general_translations[lemma] = general_trans
-
-                if idx % 10 == 0 or idx == len(all_unique_lemmas):
-                    print(f"    Progress: {idx}/{len(all_unique_lemmas)} lemmas translated")
-            except Exception as e:
-                print(f"    Error translating '{lemma}': {e}")
-                continue
+    # Debug: Show sample translations
+    if general_translations:
+        sample_lemma = list(general_translations.keys())[0]
+        sample_trans = general_translations[sample_lemma]
+        print(f"  Sample: '{sample_lemma}' -> RU: {sample_trans.russian}, ES: {sample_trans.spanish}")
+    else:
+        print(f"  WARNING: Batch translation returned empty list!")
 
     # Step 6: Build vocabulary cards from batch results
     print("Constructing vocabulary cards...")
@@ -698,14 +487,9 @@ __all__ = [
     # Helper functions
     "transform_to_sentence_map",
     "highlight_word_in_context",
-    # Single-word translation (legacy, kept for backward compatibility)
-    "translate_word_in_context",
-    "translate_word_general",
-    "generate_vocabulary_card",
     # Batch translation
     "batch_translate_sentence_words",
     "batch_translate_words_general",
-    # Pipeline functions
-    "process_lemma_batch",
+    # Pipeline
     "build_vocabulary_pipeline",
 ]

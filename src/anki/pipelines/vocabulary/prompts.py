@@ -17,22 +17,6 @@ def load_prompt(name: str) -> str:
     return prompt_file.read_text(encoding="utf-8")
 
 
-def build_translation_prompts() -> Dict[str, str]:
-    """Build system and human prompts for word-in-context translation."""
-    return {
-        "system": load_prompt("translation_system"),
-        "human": load_prompt("translation_human"),
-    }
-
-
-def build_word_translation_prompts() -> Dict[str, str]:
-    """Build system and human prompts for general word translation."""
-    return {
-        "system": load_prompt("word_translation_system"),
-        "human": load_prompt("word_translation_human"),
-    }
-
-
 def build_batch_translation_prompts() -> Dict[str, str]:
     """Build system and human prompts for batch word-in-context translation."""
     return {
@@ -50,8 +34,6 @@ def build_batch_word_translation_prompts() -> Dict[str, str]:
 
 
 __all__ = [
-    "build_translation_prompts",
-    "build_word_translation_prompts",
     "build_batch_translation_prompts",
     "build_batch_word_translation_prompts",
 ]

@@ -2,15 +2,14 @@
 Lemmatizer to Anki pipeline.
 
 This package processes lemmatized text and generates Anki vocabulary cards
-with translations to multiple languages.
+with translations to multiple languages using batch translation for efficiency.
 """
 
 from .models import VocabularyCard, VocabularyDeck
-from .chains import generate_vocabulary_card, process_lemma_batch
+from .chains import build_vocabulary_pipeline
 
 __all__ = [
     "VocabularyCard",
     "VocabularyDeck",
-    "generate_vocabulary_card",
-    "process_lemma_batch",
+    "build_vocabulary_pipeline",
 ]
