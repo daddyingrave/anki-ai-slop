@@ -3,18 +3,18 @@
 pipelines:
   obsidian_to_anki:
     # Discovery
-    vault_dir: /Users/daddyingrave/Documents/default
-    notes_path: Clippings/Heaps.md
+    vault_dir: /Users/daddyingrave/Code/Personal/eat-ai-shit
+    notes_path: out/Computing Systems Elements 2nd Ed-part-3.md
 
     generate:
       model: models/gemini-2.0-flash-lite
-      temperature: 0.2
+      temperature: 0.4
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
     review:
       model: models/gemini-2.0-flash-lite
-      temperature: 0.1
+      temperature: 0.0
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0

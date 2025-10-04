@@ -1,10 +1,10 @@
 """
-Entry point for `python -m to_md`.
+Entry point for `python -m mistral_ocr`.
 
-This delegates to the IDE-configured runner in `to_md.run` without
+This delegates to the IDE-configured runner in `mistral_ocr.run` without
 introducing any CLI arguments. Edit variables in run.py and then run:
 
-    uv run --project <project_path> --module to_md
+    uv run --project <project_path> --module mistral_ocr
 
 """
 from __future__ import annotations

@@ -8,10 +8,10 @@ dependencies = [
   "langchain==0.3.27",
   "langchain-community==0.3.30",
   "langchain-google-genai==2.1.12",
-  "pydantic==2.11.9",
+  "pydantic==2.11.10",
   "pyyaml==6.0.3",
-  "docling[easyocr]>=2.55.1",
   "Pillow>=10.0.0",
+  "mistralai>=1.0.0",
 ]
 
 [build-system]
@@ -19,4 +19,4 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/anki", "src/to_md"]
+packages = ["src/anki", "src/mistral_ocr"]
