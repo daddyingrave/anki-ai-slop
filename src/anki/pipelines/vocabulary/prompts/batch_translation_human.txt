@@ -1,0 +1,14 @@
+Translate the following words from the SAME English sentence to Russian and Spanish:
+
+Sentence: {sentence}
+
+{context_info}
+
+Words to translate:
+{words_list}
+
+Provide translations for ALL words above. Remember:
+1. Include the full Russian sentence translation with the FIRST word only
+2. Set russian_sentence to null for all other words
+3. Ensure translations are consistent with the sentence context
+4. For phrasal verbs, translate as a unit and mark is_phrasal_verb=true

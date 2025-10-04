@@ -33,7 +33,25 @@ def build_word_translation_prompts() -> Dict[str, str]:
     }
 
 
+def build_batch_translation_prompts() -> Dict[str, str]:
+    """Build system and human prompts for batch word-in-context translation."""
+    return {
+        "system": load_prompt("batch_translation_system"),
+        "human": load_prompt("batch_translation_human"),
+    }
+
+
+def build_batch_word_translation_prompts() -> Dict[str, str]:
+    """Build system and human prompts for batch general word translation."""
+    return {
+        "system": load_prompt("batch_word_translation_system"),
+        "human": load_prompt("batch_word_translation_human"),
+    }
+
+
 __all__ = [
     "build_translation_prompts",
     "build_word_translation_prompts",
+    "build_batch_translation_prompts",
+    "build_batch_word_translation_prompts",
 ]
