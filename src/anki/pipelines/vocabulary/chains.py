@@ -249,62 +249,41 @@ def build_vocabulary_pipeline(
 
     # Step 2: Extract and group words by sentence
     print("Extracting lemmas and grouping by sentence...")
-    sentence_groups = extractor.process_file(input_file, phrasal_verbs_file)
-
-    # Count unique lemmas for reporting
-    all_lemmas = {w.lemma for group in sentence_groups for w in group.words if not w.is_phrasal_verb}
-    all_phrasal_verbs = {w.lemma for group in sentence_groups for w in group.words if w.is_phrasal_verb}
-
-    print(f"Extracted {len(all_lemmas)} lemmas and {len(all_phrasal_verbs)} phrasal verbs")
-    print(f"Grouped into {len(sentence_groups)} unique sentences")
+    sentences = extractor.process_file(input_file, phrasal_verbs_file)
 
     # Step 3: Batch translate words by sentence (ONE LLM call per sentence for all words)
-    print("Batch translating words in context...")
+    print("Batch translating words in context and general meanings...")
     sentence_translations: Dict[str, BatchSentenceTranslationResponse] = {}
+    general_translations: Dict[str, WordTranslationResponse] = {}
 
-    for idx, sentence_group in enumerate(sentence_groups, 1):
+    for idx, sentence in enumerate(sentences, 1):
         try:
-            # ONE LLM call translates ALL words in this sentence
-            batch_result = batch_translate_sentence_words(sentence_group, translate_step)
-            sentence_translations[sentence_group.sentence] = batch_result
+            # ONE LLM call translates ALL words in this sentence (context)
+            batch_result = batch_translate_sentence_words(sentence, translate_step)
+            sentence_translations[sentence.sentence] = batch_result
 
-            if idx % 5 == 0 or idx == len(sentence_groups):
-                print(f"  Progress: {idx}/{len(sentence_groups)} sentences translated")
+            # Collect lemmas from current sentence that we haven't translated yet
+            sentence_lemmas: Dict[str, WordInSentence] = {}
+            for word in sentence.words:
+                if word.lemma not in general_translations:
+                    sentence_lemmas[word.lemma] = word
+
+            # Batch translate general meanings for lemmas in this sentence
+            if sentence_lemmas:
+                general_batch_result = batch_translate_words_general(sentence_lemmas, translate_step)
+                for trans in general_batch_result.translations:
+                    general_translations[trans.lemma] = WordTranslationResponse(
+                        russian=trans.russian,
+                        spanish=trans.spanish
+                    )
+
+            if idx % 5 == 0 or idx == len(sentences):
+                print(f"  Progress: {idx}/{len(sentences)} sentences translated")
         except Exception as e:
             print(f"  Error translating sentence: {e}")
             continue
 
-    # Step 4: Collect unique lemmas for general translation
-    all_unique_lemmas: Dict[str, WordInSentence] = {}
-    for sentence_group in sentence_groups:
-        for word in sentence_group.words:
-            if word.lemma not in all_unique_lemmas:
-                all_unique_lemmas[word.lemma] = word
-
-    # Step 5: Batch translate general meanings (ALL lemmas in ONE LLM call)
-    print(f"Batch translating {len(all_unique_lemmas)} unique lemmas (general meanings)...")
-
-    batch_result = batch_translate_words_general(all_unique_lemmas, translate_step)
-
-    # Convert list of translations to dict: lemma -> WordTranslationResponse
-    general_translations: Dict[str, WordTranslationResponse] = {}
-    for trans in batch_result.translations:
-        general_translations[trans.lemma] = WordTranslationResponse(
-            russian=trans.russian,
-            spanish=trans.spanish
-        )
-
-    print(f"  Success: Translated all {len(general_translations)} lemmas in 1 LLM call")
-
-    # Debug: Show sample translations
-    if general_translations:
-        sample_lemma = list(general_translations.keys())[0]
-        sample_trans = general_translations[sample_lemma]
-        print(f"  Sample: '{sample_lemma}' -> RU: {sample_trans.russian}, ES: {sample_trans.spanish}")
-    else:
-        print(f"  WARNING: Batch translation returned empty list!")
-
-    # Step 6: Build vocabulary cards from batch results
+    # Step 4: Build vocabulary cards from batch results
     print("Constructing vocabulary cards...")
     cards: List[VocabularyCard] = []
 
@@ -313,23 +292,23 @@ def build_vocabulary_pipeline(
     # Build sentence translation lookup: sentence -> russian_sentence
     sentence_translation_lookup: Dict[str, str] = {}
 
-    for sentence, batch_result in sentence_translations.items():
+    for sentenceRaw, batch_result in sentence_translations.items():
         # Extract the sentence translation from the first word that has it
         for word_trans in batch_result.words:
-            context_lookup[(sentence, word_trans.lemma)] = word_trans
+            context_lookup[(sentenceRaw, word_trans.lemma)] = word_trans
             # Cache the sentence translation (it's in the first word)
-            if word_trans.russian_sentence and sentence not in sentence_translation_lookup:
-                sentence_translation_lookup[sentence] = word_trans.russian_sentence
+            if word_trans.russian_sentence and sentenceRaw not in sentence_translation_lookup:
+                sentence_translation_lookup[sentenceRaw] = word_trans.russian_sentence
 
     # Create one card per unique lemma (use first occurrence)
     processed_lemmas = set()
 
-    for sentence_group in sentence_groups:
-        sentence = sentence_group.sentence
+    for sentence in sentences:
+        sentenceRaw = sentence.sentence
         # Get the cached sentence translation for this sentence
-        russian_sentence = sentence_translation_lookup.get(sentence)
+        russian_sentence = sentence_translation_lookup.get(sentenceRaw)
 
-        for word in sentence_group.words:
+        for word in sentence.words:
             # Only create card for first occurrence of each lemma
             if word.lemma in processed_lemmas:
                 continue
@@ -337,7 +316,7 @@ def build_vocabulary_pipeline(
             processed_lemmas.add(word.lemma)
 
             # Get context translation from batch result
-            context_trans = context_lookup.get((sentence, word.lemma))
+            context_trans = context_lookup.get((sentenceRaw, word.lemma))
             if not context_trans:
                 print(f"  Warning: No context translation for '{word.lemma}'")
                 continue
@@ -349,7 +328,7 @@ def build_vocabulary_pipeline(
 
             # Create card
             card_id = f"{word.lemma}/{word.part_of_speech}"
-            highlighted_context = highlight_word_in_context(word.original_word, sentence)
+            highlighted_context = highlight_word_in_context(word.original_word, sentenceRaw)
 
             card = VocabularyCard(
                 card_id=card_id,
