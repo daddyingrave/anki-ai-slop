@@ -1,0 +1,45 @@
+Unified rules for translating vocabulary words (apply to BOTH translation and review steps)
+
+Output requirements:
+- Produce translations that are accurate, context-appropriate, and educationally valuable
+- Every translation must be self-contained and useful for language learning
+- Lemmas must be correct base forms of words (check for spaCy errors)
+
+Translation quality rules:
+- Accuracy: Translations must reflect the actual meaning in context
+- Consistency: Related words should use consistent terminology
+- Brevity: Keep translations concise (1-3 words typically)
+- Natural language: Use natural, idiomatic expressions in target languages
+- Educational value: Prioritize commonly used translations over rare ones
+
+Context translation specific rules:
+- Word translations must match the specific meaning in the sentence
+- Sentence translations must be natural and fluent
+- Include the full Russian sentence translation with the FIRST word only
+- Set russian_sentence to null for all subsequent words
+- Phrasal verbs must be translated as a unit (mark is_phrasal_verb=true)
+- Function words that don't translate directly should have linguistic explanations
+
+General translation specific rules:
+- Focus on the most common, general meanings (not context-specific)
+- Provide up to 2 most frequent translations per language
+- Translations should work across multiple contexts
+- Proper nouns should return empty lists
+- Each language's translations are independent
+
+Lemma verification rules:
+- Check that lemmas are correct base forms (infinitive for verbs, singular for nouns, etc.)
+- Common spaCy errors to watch for:
+  - Incorrectly lemmatized phrasal verbs (e.g., "look up" → "look" instead of "look up")
+  - Past participles not reduced to infinitive
+  - Plural nouns not reduced to singular
+  - Gerunds (-ing forms) that should be infinitives
+- If a lemma is incorrect, correct it in the output
+
+Translation verification checklist:
+- Russian translations use appropriate grammatical forms
+- Spanish translations match in number/gender where applicable
+- No English words in translation fields
+- No placeholder text like "...", "TBD", etc.
+- Translations are appropriate for the part of speech
+- No duplicate translations in the same language list

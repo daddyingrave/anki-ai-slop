@@ -51,11 +51,7 @@ class VocabularyPipelineConfig(BaseModel):
 
     # Translation step configuration
     translate: StepConfig
-
-
-# Backwards compatibility aliases
-ObsidianToAnkiPipelineConfig = ObsidianPipelineConfig
-LemmatizerToAnkiPipelineConfig = VocabularyPipelineConfig
+    review: StepConfig
 
 
 class RunConfig(BaseModel):

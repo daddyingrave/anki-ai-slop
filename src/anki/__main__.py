@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from anki.anki_sync.anki_connect import anki_id, sync_anki_cards
 from anki.common.observability import enable_cache
-from anki.config_models import RunConfig, ObsidianToAnkiPipelineConfig, LemmatizerToAnkiPipelineConfig
+from anki.config_models import RunConfig, ObsidianPipelineConfig, VocabularyPipelineConfig
 from anki.pipelines.obsidian.chains import build_obsidian_pipeline
 from anki.pipelines.vocabulary.chains import build_vocabulary_pipeline
 from anki.pipelines.vocabulary.models import vocabulary_card_to_note
@@ -57,7 +57,7 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
         raise SystemExit("Missing pipelines configuration")
 
     if pipeline_name == "obsidian_to_anki":
-        pipeline_cfg: ObsidianToAnkiPipelineConfig | None = cfg.pipelines.get("obsidian_to_anki")
+        pipeline_cfg: ObsidianPipelineConfig | None = cfg.pipelines.get("obsidian_to_anki")
         if pipeline_cfg is None:
             raise SystemExit("Missing pipelines.obsidian_to_anki configuration after normalization")
 
@@ -85,10 +85,10 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
                 json.dumps(deck.model_dump(), ensure_ascii=False, indent=2),
                 encoding="utf-8")
 
-    elif pipeline_name == "lemmatizer_to_anki":
-        pipeline_cfg: LemmatizerToAnkiPipelineConfig | None = cfg.pipelines.get("lemmatizer_to_anki")
+    elif pipeline_name == "vocabulary":
+        pipeline_cfg: VocabularyPipelineConfig | None = cfg.pipelines.get("vocabulary")
         if pipeline_cfg is None:
-            raise SystemExit("Missing pipelines.lemmatizer_to_anki configuration after normalization")
+            raise SystemExit("Missing pipelines.vocabulary configuration after normalization")
 
         input_file = Path(pipeline_cfg.input_file)
         if not input_file.exists() or not input_file.is_file():
@@ -110,6 +110,7 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
             model_type=pipeline_cfg.model_type,
             phrasal_verbs_file=phrasal_verbs_path,
             translate_step=pipeline_cfg.translate,
+            review_step=pipeline_cfg.review,
         )
 
         # Sync to Anki
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pipeline-name",
         required=True,
-        help="Pipeline to run (e.g., obsidian_to_anki, lemmatizer_to_anki)"
+        help="Pipeline to run (e.g., obsidian_to_anki, vocabulary)"
     )
     parser.add_argument(
         "--config",

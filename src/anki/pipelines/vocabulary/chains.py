@@ -13,6 +13,8 @@ from anki.pipelines.vocabulary.models import VocabularyCard, VocabularyDeck, Tra
 from anki.pipelines.vocabulary.prompts import (
     build_ctx_translation_prompts,
     build_general_translation_prompts,
+    build_ctx_review_prompts,
+    build_general_review_prompts,
 )
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
@@ -66,7 +68,7 @@ class WordContextTranslation(BaseModel):
     russian_sentence: str | None = Field(None, description="Russian translation of the full sentence (only provided once per sentence)")
 
 
-class SentenceTranslationResponse(BaseModel):
+class CtxTranslationResponse(BaseModel):
     """Translation response for all words in a single sentence."""
     words: List[WordContextTranslation] = Field(..., description="Translations for each word in the sentence")
 
@@ -134,10 +136,10 @@ def translate_words_general(
     return result
 
 
-def translate_sentence_words(
+def translate_words_ctx(
         sentence_with_words: SentenceWithWords,
         step: StepConfig,
-) -> SentenceTranslationResponse:
+) -> CtxTranslationResponse:
     """Translate multiple words from a sentence with context in a single LLM call.
 
     Args:
@@ -178,8 +180,8 @@ def translate_sentence_words(
         ("human", prompts["human"]),
     ])
 
-    chain = prompt | llm.with_structured_output(SentenceTranslationResponse)
-    result = cast(SentenceTranslationResponse, retry_invoke(
+    chain = prompt | llm.with_structured_output(CtxTranslationResponse)
+    result = cast(CtxTranslationResponse, retry_invoke(
         chain,
         {
             "sentence": sentence_with_words.sentence,
@@ -197,19 +199,142 @@ def translate_sentence_words(
     return result
 
 
+def review_translation_ctx(
+        sentence_with_words: SentenceWithWords,
+        translations: CtxTranslationResponse,
+        step: StepConfig,
+) -> CtxTranslationResponse:
+    """Review and fix context translations for a sentence.
+
+    Args:
+        sentence_with_words: Sentence with all words
+        translations: Current translations to review
+        step: Step configuration
+
+    Returns:
+        Reviewed and corrected translations
+    """
+    import json
+
+    llm = build_llm(model=step.model, temperature=step.temperature)
+    prompts = build_ctx_review_prompts()
+
+    # Format context info
+    context_info = ""
+    if sentence_with_words.context:
+        ctx = sentence_with_words.context
+        if ctx.previous_sentence:
+            context_info += f"Previous sentence: {ctx.previous_sentence}\n"
+        context_info += f"Current sentence: {ctx.sentence}\n"
+        if ctx.next_sentence:
+            context_info += f"Next sentence: {ctx.next_sentence}\n"
+    else:
+        context_info = f"Sentence: {sentence_with_words.sentence}"
+
+    # Format words list
+    words_list = ""
+    for idx, word in enumerate(sentence_with_words.words, 1):
+        words_list += f"{idx}. Lemma: {word.lemma}\n"
+        words_list += f"   As it appears: {word.original_word}\n"
+        words_list += f"   Part of speech: {word.part_of_speech}\n"
+        if word.is_phrasal_verb:
+            words_list += f"   NOTE: This is a phrasal verb\n"
+        words_list += "\n"
+
+    # Serialize current translations
+    translations_json = json.dumps(translations.model_dump(), indent=2, ensure_ascii=False)
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", prompts["system"]),
+        ("human", prompts["human"]),
+    ])
+
+    chain = prompt | llm.with_structured_output(CtxTranslationResponse)
+    result = cast(CtxTranslationResponse, retry_invoke(
+        chain,
+        {
+            "sentence": sentence_with_words.sentence,
+            "context_info": context_info,
+            "words_list": words_list,
+            "translations_json": translations_json,
+        },
+        max_retries=step.max_retries,
+        backoff_initial_seconds=step.backoff_initial_seconds,
+        backoff_multiplier=step.backoff_multiplier,
+    ))
+
+    if result is None:
+        raise RuntimeError(f"LLM did not return review for sentence: {sentence_with_words.sentence[:50]}...")
+
+    return result
+
+
+def review_general_translations(
+        words: Dict[str, WordInSentence],
+        translations: GeneralTranslationResponse,
+        step: StepConfig,
+) -> GeneralTranslationResponse:
+    """Review and fix general translations.
+
+    Args:
+        words: Dictionary mapping lemma -> WordInSentence info
+        translations: Current translations to review
+        step: Step configuration
+
+    Returns:
+        Reviewed and corrected translations
+    """
+    import json
+
+    llm = build_llm(model=step.model, temperature=step.temperature)
+    prompts = build_general_review_prompts()
+
+    # Format words list with part of speech info
+    words_list = ""
+    for lemma, word_info in words.items():
+        words_list += f"- \"{lemma}\" ({word_info.part_of_speech})\n"
+
+    # Serialize current translations
+    translations_json = json.dumps(translations.model_dump(), indent=2, ensure_ascii=False)
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", prompts["system"]),
+        ("human", prompts["human"]),
+    ])
+
+    chain = prompt | llm.with_structured_output(GeneralTranslationResponse)
+    result = cast(GeneralTranslationResponse, retry_invoke(
+        chain,
+        {
+            "words_list": words_list,
+            "translations_json": translations_json,
+        },
+        max_retries=step.max_retries,
+        backoff_initial_seconds=step.backoff_initial_seconds,
+        backoff_multiplier=step.backoff_multiplier,
+    ))
+
+    if result is None:
+        raise RuntimeError("LLM did not return review for general translations")
+
+    return result
+
+
 def build_vocabulary_pipeline(
         input_file: str,
         language: str,
         model_type: str,
         phrasal_verbs_file: str | None,
         translate_step: StepConfig,
+        review_step: StepConfig,
 ) -> List[VocabularyCard]:
     """Complete pipeline to process a text file and generate vocabulary cards.
 
     This pipeline:
     1. Extracts lemmas using the lemmatizer
-    2. Generates vocabulary cards with translations
-    3. Returns a list of VocabularyCard objects
+    2. Translates words in context and general meanings
+    3. Reviews and fixes translations
+    4. Returns a list of VocabularyCard objects
 
     Args:
         input_file: Path to the input text file
@@ -217,6 +342,7 @@ def build_vocabulary_pipeline(
         model_type: Model type ("EFFICIENT", "ACCURATE", "TRANSFORMER")
         phrasal_verbs_file: Optional path to phrasal verbs CSV file
         translate_step: Step configuration for translation
+        review_step: Step configuration for review
 
     Returns:
         List of VocabularyCard objects
@@ -246,16 +372,19 @@ def build_vocabulary_pipeline(
     print("Extracting lemmas and grouping by sentence...")
     sentences = extractor.process_file(input_file, phrasal_verbs_file)
 
-    # Step 3: Translate words by sentence (context + general meanings)
-    print("Translating words in context and general meanings...")
-    sentence_translations: Dict[str, SentenceTranslationResponse] = {}
+    # Step 3: Translate and review words by sentence (context + general meanings)
+    print("Translating and reviewing words in context and general meanings...")
+    ctx_translations: Dict[str, CtxTranslationResponse] = {}
     general_translations: Dict[str, WordTranslationResponse] = {}
 
     for idx, sentence_group in enumerate(sentences, 1):
         try:
             # Translate all words in this sentence with context
-            ctx_result = translate_sentence_words(sentence_group, translate_step)
-            sentence_translations[sentence_group.sentence] = ctx_result
+            ctx_result = translate_words_ctx(sentence_group, translate_step)
+
+            # Review context translation
+            ctx_result = review_translation_ctx(sentence_group, ctx_result, review_step)
+            ctx_translations[sentence_group.sentence] = ctx_result
 
             # Collect lemmas from current sentence that we haven't translated yet
             sentence_lemmas: Dict[str, WordInSentence] = {}
@@ -266,6 +395,10 @@ def build_vocabulary_pipeline(
             # Translate general meanings for lemmas in this sentence
             if sentence_lemmas:
                 general_result = translate_words_general(sentence_lemmas, translate_step)
+
+                # Review general translation
+                general_result = review_general_translations(sentence_lemmas, general_result, review_step)
+
                 for trans in general_result.translations:
                     general_translations[trans.lemma] = WordTranslationResponse(
                         russian=trans.russian,
@@ -273,9 +406,9 @@ def build_vocabulary_pipeline(
                     )
 
             if idx % 5 == 0 or idx == len(sentences):
-                print(f"  Progress: {idx}/{len(sentences)} sentences translated")
+                print(f"  Progress: {idx}/{len(sentences)} sentences translated and reviewed")
         except Exception as e:
-            print(f"  Error translating sentence: {e}")
+            print(f"  Error translating/reviewing sentence: {e}")
             continue
 
     # Step 4: Build vocabulary cards from translation results
@@ -287,7 +420,7 @@ def build_vocabulary_pipeline(
     # Build sentence translation lookup: sentence -> russian_sentence
     sentence_translation_lookup: Dict[str, str] = {}
 
-    for sentence_text, ctx_result in sentence_translations.items():
+    for sentence_text, ctx_result in ctx_translations.items():
         # Extract the sentence translation from the first word that has it
         for word_trans in ctx_result.words:
             context_lookup[(sentence_text, word_trans.lemma)] = word_trans

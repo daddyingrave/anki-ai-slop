@@ -1,0 +1,21 @@
+Sentence: {sentence}
+
+{context_info}
+
+Words to translate:
+{words_list}
+
+Current translations (JSON):
+{translations_json}
+
+Task:
+- Review and fix the translations to ensure accuracy, naturalness, and consistency
+- Verify lemmas are correct base forms (fix any spaCy lemmatization errors)
+- Ensure Russian sentence translation is fluent and natural
+- Ensure word translations match the context appropriately
+- Fix any grammatical errors or unnatural phrasing
+- Verify translations are appropriate for each word's part of speech
+- Ensure phrasal verbs are correctly identified and translated as units
+
+Unified rules to enforce:
+{{TRANSLATION_RULES}}

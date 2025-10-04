@@ -1,0 +1,17 @@
+Words to translate:
+{words_list}
+
+Current translations (JSON):
+{translations_json}
+
+Task:
+- Review and fix the translations to ensure they represent the most common general meanings
+- Verify lemmas are correct base forms (fix any spaCy lemmatization errors)
+- Ensure translations are general (not context-specific)
+- Verify translations are appropriate for each word's part of speech
+- Remove any rare or uncommon translations
+- Ensure up to 2 most frequent translations per language
+- Verify proper nouns have empty translation lists
+
+Unified rules to enforce:
+{{TRANSLATION_RULES}}
