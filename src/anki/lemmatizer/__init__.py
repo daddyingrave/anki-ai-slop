@@ -13,12 +13,7 @@ from .lemma_extractor import (
     ModelType,
     LemmaEntry,
     PhrasalVerbEntry,
+    WordInSentence,
+    SentenceContext,
+    SentenceWithWords,
 )
-
-__all__ = [
-    "LemmaExtractor",
-    "LanguageMnemonic",
-    "ModelType",
-    "LemmaEntry",
-    "PhrasalVerbEntry",
-]

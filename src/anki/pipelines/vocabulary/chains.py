@@ -17,29 +17,14 @@ from anki.pipelines.vocabulary.prompts import (
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
 from anki.config_models import StepConfig
-from anki.lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
-
-
-class SentenceContext(BaseModel):
-    """Context information for a sentence."""
-    sentence: str = Field(..., description="The current sentence")
-    previous_sentence: str | None = Field(None, description="Previous sentence for context")
-    next_sentence: str | None = Field(None, description="Next sentence for context")
-
-
-class WordInSentence(BaseModel):
-    """Information about a word occurrence in a specific sentence."""
-    lemma: str = Field(..., description="The base form of the word")
-    original_word: str = Field(..., description="Word as it appears in the sentence")
-    part_of_speech: str = Field(..., description="Part of speech tag")
-    is_phrasal_verb: bool = Field(default=False, description="Whether this is a phrasal verb")
-
-
-class SentenceWithWords(BaseModel):
-    """A sentence with all words that need translation."""
-    sentence: str = Field(..., description="The sentence text")
-    words: List[WordInSentence] = Field(..., description="Words to translate in this sentence")
-    context: SentenceContext | None = Field(None, description="Context sentences")
+from anki.lemmatizer import (
+    LemmaExtractor,
+    LanguageMnemonic,
+    ModelType,
+    SentenceContext,
+    SentenceWithWords,
+    WordInSentence,
+)
 
 
 class ContextTranslationResponse(BaseModel):
@@ -264,34 +249,7 @@ def build_vocabulary_pipeline(
 
     # Step 2: Extract and group words by sentence
     print("Extracting lemmas and grouping by sentence...")
-    sentence_groups_raw = extractor.process_file(input_file, phrasal_verbs_file)
-
-    # Convert TypedDict to Pydantic models
-    sentence_groups: List[SentenceWithWords] = []
-    for group in sentence_groups_raw:
-        words = [
-            WordInSentence(
-                lemma=w["lemma"],
-                original_word=w["original_word"],
-                part_of_speech=w["part_of_speech"],
-                is_phrasal_verb=w["is_phrasal_verb"],
-            )
-            for w in group["words"]
-        ]
-
-        context = None
-        if group["context"]:
-            context = SentenceContext(
-                sentence=group["context"]["sentence"],
-                previous_sentence=group["context"].get("previous_sentence"),
-                next_sentence=group["context"].get("next_sentence"),
-            )
-
-        sentence_groups.append(SentenceWithWords(
-            sentence=group["sentence"],
-            words=words,
-            context=context,
-        ))
+    sentence_groups = extractor.process_file(input_file, phrasal_verbs_file)
 
     # Count unique lemmas for reporting
     all_lemmas = {w.lemma for group in sentence_groups for w in group.words if not w.is_phrasal_verb}

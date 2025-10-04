@@ -11,6 +11,7 @@ from enum import Enum, auto
 from typing import Dict, List, TypedDict, Optional, Tuple
 
 import spacy
+from pydantic import BaseModel, Field
 from spacy.matcher import Matcher
 
 from .phrasal_verb_processor import (
@@ -54,26 +55,26 @@ class PhrasalVerbEntry(TypedDict):
     original_text: str
 
 
-class WordInSentenceDict(TypedDict):
-    """Type definition for a word occurrence in a sentence."""
-    lemma: str
-    original_word: str
-    part_of_speech: str
-    is_phrasal_verb: bool
+class WordInSentence(BaseModel):
+    """Information about a word occurrence in a specific sentence."""
+    lemma: str = Field(..., description="The base form of the word")
+    original_word: str = Field(..., description="Word as it appears in the sentence")
+    part_of_speech: str = Field(..., description="Part of speech tag")
+    is_phrasal_verb: bool = Field(default=False, description="Whether this is a phrasal verb")
 
 
-class SentenceContextDict(TypedDict, total=False):
-    """Type definition for sentence context."""
-    sentence: str
-    previous_sentence: Optional[str]
-    next_sentence: Optional[str]
+class SentenceContext(BaseModel):
+    """Context information for a sentence."""
+    sentence: str = Field(..., description="The current sentence")
+    previous_sentence: Optional[str] = Field(None, description="Previous sentence for context")
+    next_sentence: Optional[str] = Field(None, description="Next sentence for context")
 
 
-class SentenceWithWordsDict(TypedDict):
-    """Type definition for a sentence with all words to translate."""
-    sentence: str
-    words: List[WordInSentenceDict]
-    context: Optional[SentenceContextDict]
+class SentenceWithWords(BaseModel):
+    """A sentence with all words that need translation."""
+    sentence: str = Field(..., description="The sentence text")
+    words: List[WordInSentence] = Field(..., description="Words to translate in this sentence")
+    context: Optional[SentenceContext] = Field(None, description="Context sentences")
 
 
 class LemmaExtractor:
@@ -261,7 +262,7 @@ class LemmaExtractor:
 
         return dict(phrasal_verb_to_sentences)
 
-    def process_file(self, file_path: str, phrasal_verbs_path: Optional[str] = None) -> List[SentenceWithWordsDict]:
+    def process_file(self, file_path: str, phrasal_verbs_path: Optional[str] = None) -> List[SentenceWithWords]:
         """
         Process a text file and return words grouped by sentence (optimized for batch translation).
 
@@ -270,7 +271,7 @@ class LemmaExtractor:
             phrasal_verbs_path (Optional[str]): Path to the phrasal verbs file (optional)
 
         Returns:
-            List[SentenceWithWordsDict]: List of sentences with their words and context
+            List[SentenceWithWords]: List of sentences with their words and context
         """
         # Check if file exists
         if not os.path.isfile(file_path):
@@ -282,8 +283,8 @@ class LemmaExtractor:
         print("Processing text with spaCy...")
         doc = self.nlp(file_content)
 
-        # Build mapping: sentence -> list of words (directly)
-        sentence_to_words: Dict[str, List[WordInSentenceDict]] = defaultdict(list)
+        # Build mapping: sentence -> list of words (directly as Pydantic models)
+        sentence_to_words: Dict[str, List[WordInSentence]] = defaultdict(list)
 
         # Process lemmas
         for sent in doc.sents:
@@ -299,16 +300,16 @@ class LemmaExtractor:
                 if not lemma:
                     continue
 
-                word_info: WordInSentenceDict = {
-                    "lemma": lemma,
-                    "original_word": token.text,
-                    "part_of_speech": self.get_human_readable_pos(token.pos_),
-                    "is_phrasal_verb": False,
-                }
+                word_info = WordInSentence(
+                    lemma=lemma,
+                    original_word=token.text,
+                    part_of_speech=self.get_human_readable_pos(token.pos_),
+                    is_phrasal_verb=False,
+                )
 
                 # Avoid duplicates
                 if not any(
-                    w["lemma"] == word_info["lemma"] and w["original_word"] == word_info["original_word"]
+                    w.lemma == word_info.lemma and w.original_word == word_info.original_word
                     for w in sentence_to_words[sentence_text]
                 ):
                     sentence_to_words[sentence_text].append(word_info)
@@ -318,16 +319,16 @@ class LemmaExtractor:
         for pv_key, entries in phrasal_verbs_map.items():
             for entry in entries:
                 sentence_text = entry["sentence"]
-                word_info: WordInSentenceDict = {
-                    "lemma": pv_key,
-                    "original_word": entry["original_text"],
-                    "part_of_speech": "phrasal verb",
-                    "is_phrasal_verb": True,
-                }
+                word_info = WordInSentence(
+                    lemma=pv_key,
+                    original_word=entry["original_text"],
+                    part_of_speech="phrasal verb",
+                    is_phrasal_verb=True,
+                )
 
                 # Avoid duplicates
                 if not any(
-                    w["lemma"] == word_info["lemma"] and w["original_word"] == word_info["original_word"]
+                    w.lemma == word_info.lemma and w.original_word == word_info.original_word
                     for w in sentence_to_words[sentence_text]
                 ):
                     sentence_to_words[sentence_text].append(word_info)
@@ -337,39 +338,27 @@ class LemmaExtractor:
         sentence_index = {sent: idx for idx, sent in enumerate(sentences)}
 
         # Build result with context
-        result: List[SentenceWithWordsDict] = []
+        result: List[SentenceWithWords] = []
         for sentence, words in sentence_to_words.items():
-            context: Optional[SentenceContextDict] = None
+            context: Optional[SentenceContext] = None
             if sentence in sentence_index:
                 idx = sentence_index[sentence]
                 prev_sent = sentences[idx - 1] if idx > 0 else None
                 next_sent = sentences[idx + 1] if idx < len(sentences) - 1 else None
-                context = {
-                    "sentence": sentence,
-                    "previous_sentence": prev_sent,
-                    "next_sentence": next_sent,
-                }
+                context = SentenceContext(
+                    sentence=sentence,
+                    previous_sentence=prev_sent,
+                    next_sentence=next_sent,
+                )
 
-            result.append({
-                "sentence": sentence,
-                "words": words,
-                "context": context,
-            })
+            result.append(SentenceWithWords(
+                sentence=sentence,
+                words=words,
+                context=context,
+            ))
 
         return result
 
     def _extract_phrasal_verbs(self, doc, phrasal_verbs_path: Optional[str] = None) -> Dict[str, List[PhrasalVerbEntry]]:
         """Extract phrasal verbs from a spaCy document (internal helper)."""
         return self.process_phrasal_verbs(doc, phrasal_verbs_path)
-
-
-__all__ = [
-    "LemmaExtractor",
-    "LanguageMnemonic",
-    "ModelType",
-    "LemmaEntry",
-    "PhrasalVerbEntry",
-    "WordInSentenceDict",
-    "SentenceContextDict",
-    "SentenceWithWordsDict",
-]
