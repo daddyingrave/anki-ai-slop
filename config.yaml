@@ -23,7 +23,7 @@ pipelines:
     language: EN
     model_type: TRANSFORMER
     deck_name: Vocabulary::AI and ML
-    phrasal_verbs_file: src/lemmatizer/phrasal_verbs.csv
+    phrasal_verbs_file: data/phrasal_verbs.csv
 
     translate:
       model: models/gemini-2.0-flash-lite
