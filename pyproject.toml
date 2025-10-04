@@ -16,6 +16,7 @@ dependencies = [
     "spacy-curated-transformers>=0.3.0",
     "PyPDF2>=3.0.0",
     "pysrt>=1.1.0",
+    "en-core-web-trf>=3.8.0",
 ]
 
 [build-system]
@@ -23,7 +24,11 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/anki", "src/mistral_ocr", "src/pv_pdf_to_csv", "src/subs"]
+packages = ["src/anki", "src/mistral_ocr", "src/lemmatizer", "src/pv_pdf_to_csv", "src/subs"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "src/lemmatizer/phrasal_verbs.csv" = "share/lemmatizer/phrasal_verbs.csv"
+
+[tool.uv.sources]
+en-core-web-md = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" }
+en-core-web-trf = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.8.0/en_core_web_trf-3.8.0-py3-none-any.whl" }

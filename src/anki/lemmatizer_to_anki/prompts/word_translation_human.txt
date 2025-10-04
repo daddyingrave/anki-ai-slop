@@ -1,0 +1,7 @@
+Provide the most common general translations for this English word:
+
+Word: {word}
+Part of speech: {part_of_speech}
+
+Provide up to 2 most common translations to Russian and Spanish.
+For proper nouns, return empty lists.

@@ -117,6 +117,21 @@ class AnkiConnectClient:
     def create_deck(self, name: str) -> None:
         self.invoke("createDeck", {"deck": name})
 
+    def create_model(self, model_payload: Mapping[str, Any]) -> Dict[str, Any]:
+        """Create a new note type (model) in Anki.
+
+        Args:
+            model_payload: Dictionary with modelName, inOrderFields, css, and cardTemplates
+
+        Returns:
+            Result from AnkiConnect (usually the model object or None if it already exists)
+        """
+        return self.invoke("createModel", model_payload)
+
+    def model_names(self) -> List[str]:
+        """Get list of all note type names."""
+        return list(self.invoke("modelNames") or [])
+
     def find_notes(self, query: str) -> List[int]:
         return list(self.invoke("findNotes", {"query": query}) or [])
 
@@ -132,6 +147,32 @@ class SyncResult:
 
     def __repr__(self) -> str:
         return f"SyncResult(added={self.added}, skipped_existing={self.skipped_existing}, failures={len(self.failures)})"
+
+
+def ensure_vocabulary_improved_model(client: AnkiConnectClient) -> None:
+    """Ensure the Vocabulary Improved note type exists in Anki.
+
+    Args:
+        client: AnkiConnect client instance
+
+    Raises:
+        RuntimeError: If model creation fails
+    """
+    from .vocabulary_improved import create_vocabulary_improved_model_payload
+
+    # Check if model already exists
+    existing_models = client.model_names()
+    if "Vocabulary Improved" in existing_models:
+        return  # Model already exists
+
+    # Create the model
+    model_payload = create_vocabulary_improved_model_payload()
+    try:
+        client.create_model(model_payload)
+    except RuntimeError as e:
+        # If error contains "Model name already exists", it's fine
+        if "already exists" not in str(e).lower():
+            raise
 
 
 def sync_anki_cards(
@@ -162,6 +203,13 @@ def sync_anki_cards(
         )
         result.failures.append(f"AnkiConnect unreachable at {anki_connect_url}")
         return result
+
+    # Ensure Vocabulary Improved model exists if using that note type
+    if note_type == "Vocabulary Improved":
+        try:
+            ensure_vocabulary_improved_model(client)
+        except RuntimeError as e:
+            print(f"[anki-sync] WARNING: Failed to create Vocabulary Improved model: {e}", file=sys.stderr)
 
     # Ensure deck exists (create if not)
     try:

@@ -12,9 +12,11 @@ from pydantic import ValidationError
 
 from .anki_sync.anki_connect import anki_id, sync_anki_cards
 from .common.observability import enable_cache
-from .config_models import RunConfig, ObsidianToAnkiPipelineConfig
+from .config_models import RunConfig, ObsidianToAnkiPipelineConfig, LemmatizerToAnkiPipelineConfig
 from .obsidian_to_anki.chains import build_deck_pipeline
 from .obsidian_to_anki.models import AnkiDeck
+from .lemmatizer_to_anki.chains import generate_vocabulary_card
+from .lemmatizer_to_anki.models import vocabulary_card_to_note, VocabularyCard
 
 
 def _require_google_key() -> None:
@@ -117,20 +119,145 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
                 json.dumps(deck.model_dump(), ensure_ascii=False, indent=2),
                 encoding="utf-8")
 
+    elif pipeline_name == "lemmatizer_to_anki":
+        from .lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
+
+        pipeline_cfg: LemmatizerToAnkiPipelineConfig | None = cfg.pipelines.get("lemmatizer_to_anki")
+        if pipeline_cfg is None:
+            raise SystemExit("Missing pipelines.lemmatizer_to_anki configuration after normalization")
+
+        input_file = Path(pipeline_cfg.input_file)
+        if not input_file.exists() or not input_file.is_file():
+            raise SystemExit(f"input_file does not exist or is not a file: {input_file}")
+
+        # Get phrasal verbs file path if provided
+        phrasal_verbs_path = None
+        if pipeline_cfg.phrasal_verbs_file:
+            pv_file = Path(pipeline_cfg.phrasal_verbs_file)
+            if pv_file.exists() and pv_file.is_file():
+                phrasal_verbs_path = str(pv_file)
+            else:
+                print(f"Warning: phrasal_verbs_file not found: {pv_file}")
+
+        # Step 1: Extract lemmas using the lemmatizer
+        print(f"Processing file with lemmatizer: {input_file}")
+        print(f"Language: {pipeline_cfg.language}, Model: {pipeline_cfg.model_type}")
+
+        try:
+            lang_enum = LanguageMnemonic(pipeline_cfg.language)
+        except ValueError:
+            raise SystemExit(f"Invalid language: {pipeline_cfg.language}")
+
+        try:
+            model_type_map = {
+                "EFFICIENT": ModelType.EFFICIENT,
+                "ACCURATE": ModelType.ACCURATE,
+                "TRANSFORMER": ModelType.TRANSFORMER,
+            }
+            model_enum = model_type_map[pipeline_cfg.model_type.upper()]
+        except KeyError:
+            raise SystemExit(f"Invalid model_type: {pipeline_cfg.model_type}")
+
+        extractor = LemmaExtractor(lang_enum, model_enum)
+        lemma_map, phrasal_verb_map, text = extractor.process_file(
+            str(input_file),
+            phrasal_verbs_path
+        )
+
+        print(f"Extracted {len(lemma_map)} lemmas and {len(phrasal_verb_map)} phrasal verbs")
+
+        # Step 2: Generate vocabulary cards with translations
+        cards: List[VocabularyCard] = []
+        total_lemmas = len(lemma_map)
+
+        print(f"Generating vocabulary cards with translations...")
+        for idx, (lemma, entries) in enumerate(lemma_map.items(), 1):
+            if not entries:
+                continue
+
+            first_entry = entries[0]
+
+            try:
+                card = generate_vocabulary_card(
+                    lemma=lemma,
+                    original_word=first_entry["original_word"],
+                    context=first_entry["sentence"],
+                    part_of_speech=first_entry["part_of_speech"],
+                    step=pipeline_cfg.translate,
+                )
+                cards.append(card)
+                if idx % 10 == 0 or idx == total_lemmas:
+                    print(f"  Progress: {idx}/{total_lemmas} cards generated")
+            except Exception as e:
+                print(f"  Error generating card for '{lemma}': {e}")
+                continue
+
+        # Process phrasal verbs similarly
+        for pv_key, entries in phrasal_verb_map.items():
+            if not entries:
+                continue
+
+            first_entry = entries[0]
+
+            try:
+                card = generate_vocabulary_card(
+                    lemma=pv_key,
+                    original_word=first_entry["original_text"],
+                    context=first_entry["sentence"],
+                    part_of_speech="phrasal verb",
+                    step=pipeline_cfg.translate,
+                )
+                cards.append(card)
+            except Exception as e:
+                print(f"  Error generating card for phrasal verb '{pv_key}': {e}")
+                continue
+
+        print(f"Generated {len(cards)} vocabulary cards total")
+
+        # Step 3: Sync to Anki
+        anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
+        note_type = "Vocabulary Improved"
+
+        notes = [vocabulary_card_to_note(card) for card in cards]
+
+        print(f"Syncing {len(notes)} cards to Anki deck: {pipeline_cfg.deck_name}")
+        result = sync_anki_cards(
+            deck_name=pipeline_cfg.deck_name,
+            note_type=note_type,
+            cards=notes,
+            anki_connect_url=anki_url,
+        )
+
+        print(f"Sync complete: {result.added} added, {result.skipped_existing} skipped, {len(result.failures)} failures")
+
+        # Save cards to JSON for reference
+        output_dir = Path("out")
+        output_dir.mkdir(exist_ok=True)
+        output_file = output_dir / f"{pipeline_cfg.deck_name}_vocabulary.json"
+        output_file.write_text(
+            json.dumps([card.model_dump() for card in cards], ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+        print(f"Cards saved to: {output_file}")
+
     else:
         raise SystemExit(f"Unknown pipeline: {pipeline_name}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run pipelines and sync to Anki")
-    parser.add_argument("--pipeline-name", required=True, help="Pipeline to run (e.g., obsidian_to_anki)")
+    parser.add_argument(
+        "--pipeline-name",
+        required=True,
+        help="Pipeline to run (e.g., obsidian_to_anki, lemmatizer_to_anki)"
+    )
     parser.add_argument(
         "--config",
         required=False,
-        default=None,
+        default="config.yaml",
         help="Path to YAML config (defaults to ./config.yaml)",
     )
     args = parser.parse_args()
 
-    config_path = Path(args.config) if args.config else None
+    config_path = Path(args.config)
     run_from_config(pipeline_name=args.pipeline_name, config_path=config_path)

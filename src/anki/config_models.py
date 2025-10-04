@@ -31,13 +31,35 @@ class ObsidianToAnkiPipelineConfig(BaseModel):
     review: StepConfig
 
 
+class LemmatizerToAnkiPipelineConfig(BaseModel):
+    """Configuration for the Lemmatizer → Anki pipeline.
+
+    - input_file: path to the text file to process
+    - language: language mnemonic for lemmatization (e.g., EN, DE, FR)
+    - model_type: spaCy model type (EFFICIENT, ACCURATE, TRANSFORMER)
+    - deck_name: name of the Anki deck to create/update
+    - phrasal_verbs_file: optional path to phrasal verbs CSV file
+    - translate: configuration for translation step
+    """
+
+    # Input configuration
+    input_file: Path = Field(..., description="Path to the text file to process")
+    language: str = Field(default="EN", description="Language mnemonic (EN, DE, FR, etc.)")
+    model_type: str = Field(default="ACCURATE", description="spaCy model type (EFFICIENT, ACCURATE, TRANSFORMER)")
+    deck_name: str = Field(default="Vocabulary", description="Anki deck name")
+    phrasal_verbs_file: Path | None = Field(default=None, description="Optional path to phrasal verbs CSV file")
+
+    # Translation step configuration
+    translate: StepConfig
+
+
 class RunConfig(BaseModel):
     """Top-level run configuration (new schema only).
 
-    - pipelines: contains static keys for each pipeline type (currently only 'obsidian_to_anki')
+    - pipelines: contains static keys for each pipeline type
     """
 
     # Structured pipelines (required to run)
-    pipelines: Dict[str, ObsidianToAnkiPipelineConfig] | None = Field(
+    pipelines: Dict[str, ObsidianToAnkiPipelineConfig | LemmatizerToAnkiPipelineConfig] | None = Field(
         default=None, description="Pipelines configuration keyed by pipeline id"
     )

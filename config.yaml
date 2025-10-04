@@ -2,7 +2,6 @@
 # Pipelines configuration
 pipelines:
   obsidian_to_anki:
-    # Discovery
     vault_dir: /Users/daddyingrave/Code/Personal/eat-ai-shit
     notes_path: out/Computing Systems Elements 2nd Ed-part-3.md
 
@@ -16,5 +15,19 @@ pipelines:
       model: models/gemini-2.0-flash-lite
       temperature: 0.0
       max_retries: 2
+      backoff_initial_seconds: 0.5
+      backoff_multiplier: 2.0
+
+  lemmatizer_to_anki:
+    input_file: .testdata/text.txt
+    language: EN
+    model_type: TRANSFORMER
+    deck_name: Vocabulary::AI and ML
+    phrasal_verbs_file: src/lemmatizer/phrasal_verbs.csv
+
+    translate:
+      model: models/gemini-2.0-flash-lite
+      temperature: 0.0
+      max_retries: 3
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0

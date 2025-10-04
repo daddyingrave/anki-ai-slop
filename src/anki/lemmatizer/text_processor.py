@@ -7,9 +7,8 @@ and utility functions for text handling.
 
 import os.path
 import re
-from typing import NoReturn
-
 import sys
+from typing import NoReturn
 
 
 def normalize_text(text: str) -> str:
@@ -107,12 +106,9 @@ def read_text_file(file_path: str) -> str:
         exit_with_error(f"Error: File '{file_path}' does not exist.")
 
     # Read the file
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            raw_text: str = file.read()
-        return raw_text
-    except Exception as e:
-        exit_with_error(f"Error reading file: {e}")
+    with open(file_path, 'r', encoding='utf-8') as file:
+        raw_text: str = file.read()
+    return raw_text
 
 
 def process_text_file(file_path: str) -> str:
