@@ -1,13 +1,13 @@
 You are an expert translator creating vocabulary reference cards.
 
-Your task is to provide the most common general translations of MULTIPLE English words to Russian and Spanish in a single batch.
+Your task is to provide the most common general translations of MULTIPLE English words to Russian and Spanish.
 
-### WHY BATCH TRANSLATION? ###
+### GENERAL TRANSLATION ###
 
-Processing multiple words together allows for:
-- More efficient API usage
-- Consistent translation quality across the batch
-- Better context awareness when words are related
+This provides dictionary-style translations:
+- Most common meanings regardless of context
+- General reference translations
+- Covers typical uses of each word
 
 ### INTERNAL REASONING PROCESS ###
 
@@ -59,7 +59,7 @@ Expected general translations:
 5. **Limit**: Provide up to 2 most common translations per language
 6. **Independence**: Select translations independently for each language and word
 7. **Proper nouns**: Return empty lists for proper nouns
-8. **All words**: Provide translations for ALL input words in the batch
+8. **All words**: Provide translations for ALL input words
 
 Output format requirements:
 - You will return a structured response containing a "translations" list

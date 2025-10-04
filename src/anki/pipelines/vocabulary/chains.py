@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 
 from anki.pipelines.vocabulary.models import VocabularyCard, VocabularyDeck, Translation
 from anki.pipelines.vocabulary.prompts import (
-    build_batch_translation_prompts,
-    build_batch_word_translation_prompts,
+    build_ctx_translation_prompts,
+    build_general_translation_prompts,
 )
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
@@ -46,20 +46,19 @@ class SingleWordGeneralTranslation(BaseModel):
     spanish: List[str] = Field(default_factory=list, description="Common Spanish translations (up to 2)")
 
 
-class BatchWordTranslationResponse(BaseModel):
-    """Response model for batch general word translation.
+class GeneralTranslationResponse(BaseModel):
+    """Response model for general word translation.
 
     Contains a list of translations for multiple words.
     """
     translations: List[SingleWordGeneralTranslation] = Field(
         ...,
-        description="List of translations for each word in the batch"
+        description="List of translations for each word"
     )
 
 
-# Batch translation models
-class BatchWordContextTranslation(BaseModel):
-    """Translation for a single word in a sentence (batch context)."""
+class WordContextTranslation(BaseModel):
+    """Translation for a single word in a sentence context."""
     lemma: str = Field(..., description="The base form of the word being translated")
     is_phrasal_verb: bool = Field(..., description="Whether this is a phrasal verb")
     russian_word: str = Field(..., description="Russian translation of the word in this context")
@@ -67,9 +66,9 @@ class BatchWordContextTranslation(BaseModel):
     russian_sentence: str | None = Field(None, description="Russian translation of the full sentence (only provided once per sentence)")
 
 
-class BatchSentenceTranslationResponse(BaseModel):
-    """Batch translation response for all words in a single sentence."""
-    words: List[BatchWordContextTranslation] = Field(..., description="Translations for each word in the sentence")
+class SentenceTranslationResponse(BaseModel):
+    """Translation response for all words in a single sentence."""
+    words: List[WordContextTranslation] = Field(..., description="Translations for each word in the sentence")
 
 
 def highlight_word_in_context(word: str, context: str) -> str:
@@ -91,24 +90,22 @@ def highlight_word_in_context(word: str, context: str) -> str:
     return highlighted
 
 
-def batch_translate_words_general(
+def translate_words_general(
         words: Dict[str, WordInSentence],
         step: StepConfig,
-) -> BatchWordTranslationResponse:
+) -> GeneralTranslationResponse:
     """Translate general meanings of multiple words in a single LLM call.
-
-    This is more efficient than calling translate_word_general for each word separately.
 
     Args:
         words: Dictionary mapping lemma -> WordInSentence info
         step: Step configuration
 
     Returns:
-        Batch response with general translations for all words
+        Response with general translations for all words
     """
     llm = build_llm(model=step.model, temperature=step.temperature)
 
-    prompts = build_batch_word_translation_prompts()
+    prompts = build_general_translation_prompts()
 
     # Format words list with part of speech info
     words_list = ""
@@ -120,8 +117,8 @@ def batch_translate_words_general(
         ("human", prompts["human"]),
     ])
 
-    chain = prompt | llm.with_structured_output(BatchWordTranslationResponse)
-    result = cast(BatchWordTranslationResponse, retry_invoke(
+    chain = prompt | llm.with_structured_output(GeneralTranslationResponse)
+    result = cast(GeneralTranslationResponse, retry_invoke(
         chain,
         {
             "words_list": words_list,
@@ -132,29 +129,27 @@ def batch_translate_words_general(
     ))
 
     if result is None:
-        raise RuntimeError("LLM did not return batch general translations")
+        raise RuntimeError("LLM did not return general translations")
 
     return result
 
 
-def batch_translate_sentence_words(
+def translate_sentence_words(
         sentence_with_words: SentenceWithWords,
         step: StepConfig,
-) -> BatchSentenceTranslationResponse:
-    """Translate multiple words from the same sentence in a single LLM call.
-
-    This is more efficient than calling translate_word_in_context for each word separately.
+) -> SentenceTranslationResponse:
+    """Translate multiple words from a sentence with context in a single LLM call.
 
     Args:
         sentence_with_words: Sentence with all words to translate
         step: Step configuration
 
     Returns:
-        Batch translation response with translations for all words
+        Translation response with translations for all words in context
     """
     llm = build_llm(model=step.model, temperature=step.temperature)
 
-    prompts = build_batch_translation_prompts()
+    prompts = build_ctx_translation_prompts()
 
     # Format context info
     context_info = ""
@@ -183,8 +178,8 @@ def batch_translate_sentence_words(
         ("human", prompts["human"]),
     ])
 
-    chain = prompt | llm.with_structured_output(BatchSentenceTranslationResponse)
-    result = cast(BatchSentenceTranslationResponse, retry_invoke(
+    chain = prompt | llm.with_structured_output(SentenceTranslationResponse)
+    result = cast(SentenceTranslationResponse, retry_invoke(
         chain,
         {
             "sentence": sentence_with_words.sentence,
@@ -197,7 +192,7 @@ def batch_translate_sentence_words(
     ))
 
     if result is None:
-        raise RuntimeError(f"LLM did not return batch translation for sentence: {sentence_with_words.sentence[:50]}...")
+        raise RuntimeError(f"LLM did not return translation for sentence: {sentence_with_words.sentence[:50]}...")
 
     return result
 
@@ -251,27 +246,27 @@ def build_vocabulary_pipeline(
     print("Extracting lemmas and grouping by sentence...")
     sentences = extractor.process_file(input_file, phrasal_verbs_file)
 
-    # Step 3: Batch translate words by sentence (ONE LLM call per sentence for all words)
-    print("Batch translating words in context and general meanings...")
-    sentence_translations: Dict[str, BatchSentenceTranslationResponse] = {}
+    # Step 3: Translate words by sentence (context + general meanings)
+    print("Translating words in context and general meanings...")
+    sentence_translations: Dict[str, SentenceTranslationResponse] = {}
     general_translations: Dict[str, WordTranslationResponse] = {}
 
-    for idx, sentence in enumerate(sentences, 1):
+    for idx, sentence_group in enumerate(sentences, 1):
         try:
-            # ONE LLM call translates ALL words in this sentence (context)
-            batch_result = batch_translate_sentence_words(sentence, translate_step)
-            sentence_translations[sentence.sentence] = batch_result
+            # Translate all words in this sentence with context
+            ctx_result = translate_sentence_words(sentence_group, translate_step)
+            sentence_translations[sentence_group.sentence] = ctx_result
 
             # Collect lemmas from current sentence that we haven't translated yet
             sentence_lemmas: Dict[str, WordInSentence] = {}
-            for word in sentence.words:
+            for word in sentence_group.words:
                 if word.lemma not in general_translations:
                     sentence_lemmas[word.lemma] = word
 
-            # Batch translate general meanings for lemmas in this sentence
+            # Translate general meanings for lemmas in this sentence
             if sentence_lemmas:
-                general_batch_result = batch_translate_words_general(sentence_lemmas, translate_step)
-                for trans in general_batch_result.translations:
+                general_result = translate_words_general(sentence_lemmas, translate_step)
+                for trans in general_result.translations:
                     general_translations[trans.lemma] = WordTranslationResponse(
                         russian=trans.russian,
                         spanish=trans.spanish
@@ -283,22 +278,22 @@ def build_vocabulary_pipeline(
             print(f"  Error translating sentence: {e}")
             continue
 
-    # Step 4: Build vocabulary cards from batch results
+    # Step 4: Build vocabulary cards from translation results
     print("Constructing vocabulary cards...")
     cards: List[VocabularyCard] = []
 
     # Build lookup: (sentence, lemma) -> context translation
-    context_lookup: Dict[tuple[str, str], BatchWordContextTranslation] = {}
+    context_lookup: Dict[tuple[str, str], WordContextTranslation] = {}
     # Build sentence translation lookup: sentence -> russian_sentence
     sentence_translation_lookup: Dict[str, str] = {}
 
-    for sentenceRaw, batch_result in sentence_translations.items():
+    for sentence_text, ctx_result in sentence_translations.items():
         # Extract the sentence translation from the first word that has it
-        for word_trans in batch_result.words:
-            context_lookup[(sentenceRaw, word_trans.lemma)] = word_trans
+        for word_trans in ctx_result.words:
+            context_lookup[(sentence_text, word_trans.lemma)] = word_trans
             # Cache the sentence translation (it's in the first word)
-            if word_trans.russian_sentence and sentenceRaw not in sentence_translation_lookup:
-                sentence_translation_lookup[sentenceRaw] = word_trans.russian_sentence
+            if word_trans.russian_sentence and sentence_text not in sentence_translation_lookup:
+                sentence_translation_lookup[sentence_text] = word_trans.russian_sentence
 
     # Create one card per unique lemma (use first occurrence)
     processed_lemmas = set()

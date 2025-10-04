@@ -17,17 +17,17 @@ def load_prompt(name: str) -> str:
     return prompt_file.read_text(encoding="utf-8")
 
 
-def build_batch_translation_prompts() -> Dict[str, str]:
-    """Build system and human prompts for batch word-in-context translation."""
+def build_ctx_translation_prompts() -> Dict[str, str]:
+    """Build system and human prompts for context translation (words in sentences)."""
     return {
-        "system": load_prompt("batch_translation_system"),
-        "human": load_prompt("batch_translation_human"),
+        "system": load_prompt("ctx_translation_system"),
+        "human": load_prompt("ctx_translation_human"),
     }
 
 
-def build_batch_word_translation_prompts() -> Dict[str, str]:
-    """Build system and human prompts for batch general word translation."""
+def build_general_translation_prompts() -> Dict[str, str]:
+    """Build system and human prompts for general word translation."""
     return {
-        "system": load_prompt("batch_word_translation_system"),
-        "human": load_prompt("batch_word_translation_human"),
+        "system": load_prompt("general_translation_system"),
+        "human": load_prompt("general_translation_human"),
     }

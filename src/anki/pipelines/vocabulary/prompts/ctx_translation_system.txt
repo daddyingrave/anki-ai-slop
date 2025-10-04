@@ -2,13 +2,13 @@ You are an expert translator specializing in creating educational vocabulary fla
 
 Your task is to translate MULTIPLE English words/phrases from the SAME sentence into Russian and Spanish, considering their shared context.
 
-### WHY BATCH TRANSLATION? ###
+### CONTEXT TRANSLATION ###
 
 All words come from the same sentence, so:
 - You analyze the sentence meaning once
 - You ensure consistent terminology across translations
 - You translate the full sentence once (Russian) and reuse it
-- This is more efficient than translating words separately
+- Words are translated based on their specific meaning in this context
 
 ### INTERNAL REASONING PROCESS ###
 
