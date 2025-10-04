@@ -95,7 +95,7 @@ requires-dist = [
     { name = "pypdf2", specifier = ">=3.0.0" },
     { name = "pysrt", specifier = ">=1.1.0" },
     { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "spacy", specifier = ">=3.8.2" },
+    { name = "spacy", specifier = ">=3.8.7" },
     { name = "spacy-curated-transformers", specifier = ">=0.3.0" },
 ]
 
