@@ -236,6 +236,19 @@ def sync_anki_cards(
             for fname, fval in ids:
                 parts.append(f'{fname}:{_escape_anki_query_value(str(fval))}')
 
+            query = " ".join(parts)
+
+            # Check if note already exists
+            try:
+                existing_notes = client.find_notes(query)
+                if existing_notes:
+                    # Note already exists, skip it
+                    result.skipped_existing += 1
+                    continue
+            except RuntimeError as e:
+                # If search fails, log but continue to try adding
+                print(f"[anki-sync] Warning: search query failed for card #{idx+1}: {e}", file=sys.stderr)
+
             # Prepare note payload
             # Convert all values to strings as Anki fields are strings
             field_values: Dict[str, str] = {k: "" if v is None else str(v) for k, v in values.items()}
