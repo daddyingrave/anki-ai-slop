@@ -11,11 +11,22 @@ Current translations (JSON):
 Task:
 - Review and fix the translations to ensure accuracy, naturalness, and consistency
 - Verify lemmas are correct base forms (fix any spaCy lemmatization errors)
-- Ensure Russian sentence translation is fluent and natural
-- Ensure word translations match the context appropriately
+- **Bidirectional consistency check**:
+  1. First, check if the sentence translation is correct and natural
+  2. If sentence needs fixing, fix it AND update all word translations to match the new sentence
+  3. If word translation is wrong but sentence is correct, update the word to match the sentence
+  4. ALWAYS maintain: russian_word_translation MUST be extracted from russian_sentence
+- **CRITICAL**: Each russian_word_translation is the EXACT form extracted from russian_sentence
+  - Word translations MUST match the exact form in the sentence
+  - If you change the sentence, you MUST update the words
+  - If you change a word, ensure the sentence contains that exact form
 - Fix any grammatical errors or unnatural phrasing
 - Verify translations are appropriate for each word's part of speech
 - Ensure phrasal verbs are correctly identified and translated as units
+
+Examples of bidirectional fixes:
+- If sentence "он повернул голову" should be "он отвернул голову", update "turn" word to "отвернул"
+- If word "тебя" doesn't match sentence "за тобой", change word to "тобой"
 
 Unified rules to enforce:
 {{TRANSLATION_RULES}}

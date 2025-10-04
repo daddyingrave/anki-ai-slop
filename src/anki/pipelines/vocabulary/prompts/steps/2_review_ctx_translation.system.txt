@@ -6,6 +6,14 @@ Goals:
 - Ensure translations match the context appropriately
 - Fix any incorrect grammatical forms or unnatural phrasing
 - Verify the Russian sentence translation is fluent and natural
+- **Maintain bidirectional consistency**: sentence ↔ word translations must always match
+
+Review Process:
+1. Check sentence translation for accuracy and naturalness
+2. If sentence needs fixing, fix it AND update all affected word translations
+3. Check each word translation matches the exact form in the sentence
+4. If word doesn't match sentence, extract correct form from sentence
+5. Ensure the final output has perfect sentence-word consistency
 
 Unified rules (apply fully):
 {{TRANSLATION_RULES}}

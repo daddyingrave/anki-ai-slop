@@ -13,12 +13,35 @@ Translation quality rules:
 - Educational value: Prioritize commonly used translations over rare ones
 
 Context translation specific rules:
-- Word translations must match the specific meaning in the sentence
+- **CRITICAL**: Word translations MUST be the exact word/form extracted from the sentence translation
+- Process workflow:
+  1. First, ensure the sentence translation is correct and natural
+  2. Then, extract each word from the corrected sentence translation
+  3. If you fix the sentence, update word translations to match the new sentence
+  4. If you fix a word translation, ensure it matches what's in the sentence
+- After translating the sentence, locate each word in the translated sentence
+- Use the EXACT grammatical form that appears in the translated sentence
+- For compound phrases, use the exact phrase as it appears
+- DO NOT create separate translations - extract from the sentence
 - Sentence translations must be natural and fluent
-- Include the full Russian sentence translation with the FIRST word only
 - Set russian_sentence to null for all subsequent words
 - Phrasal verbs must be translated as a unit (mark is_phrasal_verb=true)
+- But every word from phrasal verb also should be translated separately
 - Function words that don't translate directly should have linguistic explanations
+
+Example of correct word extraction:
+- English: "he turned his head"
+- Russian sentence: "он отвернул голову"
+- Word to translate: "turn" (as "turned")
+- Correct russian_word_translation: "отвернул" (exact form from sentence)
+- Incorrect: "повернул" (different word, not in sentence)
+
+Another example:
+- English: "for you"
+- Russian sentence: "за тобой"
+- Word to translate: "you"
+- Correct russian_word_translation: "тобой" (exact form from sentence)
+- Incorrect: "тебя" (different case, not matching sentence)
 
 General translation specific rules:
 - Focus on the most common, general meanings (not context-specific)
@@ -30,7 +53,6 @@ General translation specific rules:
 Lemma verification rules:
 - Check that lemmas are correct base forms (infinitive for verbs, singular for nouns, etc.)
 - Common spaCy errors to watch for:
-  - Incorrectly lemmatized phrasal verbs (e.g., "look up" → "look" instead of "look up")
   - Past participles not reduced to infinitive
   - Plural nouns not reduced to singular
   - Gerunds (-ing forms) that should be infinitives

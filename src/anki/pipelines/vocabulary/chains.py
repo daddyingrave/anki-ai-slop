@@ -9,13 +9,6 @@ from typing import Dict, List, cast
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from anki.pipelines.vocabulary.models import VocabularyCard, VocabularyDeck, Translation
-from anki.pipelines.vocabulary.prompts import (
-    build_ctx_translation_prompts,
-    build_general_translation_prompts,
-    build_ctx_review_prompts,
-    build_general_review_prompts,
-)
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
 from anki.config_models import StepConfig
@@ -23,9 +16,15 @@ from anki.lemmatizer import (
     LemmaExtractor,
     LanguageMnemonic,
     ModelType,
-    SentenceContext,
     SentenceWithWords,
     WordInSentence,
+)
+from anki.pipelines.vocabulary.models import VocabularyCard, Translation
+from anki.pipelines.vocabulary.prompts import (
+    build_ctx_translation_prompts,
+    build_general_translation_prompts,
+    build_ctx_review_prompts,
+    build_general_review_prompts,
 )
 
 
@@ -65,7 +64,8 @@ class WordContextTranslation(BaseModel):
     is_phrasal_verb: bool = Field(..., description="Whether this is a phrasal verb")
     russian_word: str = Field(..., description="Russian translation of the word in this context")
     spanish_word: str = Field(..., description="Spanish translation of the word in this context")
-    russian_sentence: str | None = Field(None, description="Russian translation of the full sentence (only provided once per sentence)")
+    russian_sentence: str = Field(None,
+                                  description="Russian translation of the full sentence (only provided once per sentence)")
 
 
 class CtxTranslationResponse(BaseModel):
@@ -196,6 +196,17 @@ def translate_words_ctx(
     if result is None:
         raise RuntimeError(f"LLM did not return translation for sentence: {sentence_with_words.sentence[:50]}...")
 
+    russian_sentence = ""
+    for word in result.words:
+        if word.russian_sentence:
+            russian_sentence = word.russian_sentence
+            break
+
+    if russian_sentence:
+        for word in result.words:
+            if not word.russian_sentence:
+                word.russian_sentence = russian_sentence
+
     return result
 
 
@@ -265,6 +276,18 @@ def review_translation_ctx(
 
     if result is None:
         raise RuntimeError(f"LLM did not return review for sentence: {sentence_with_words.sentence[:50]}...")
+
+    russian_sentence = ""
+    for word in result.words:
+        if word.russian_sentence:
+            russian_sentence = word.russian_sentence
+            break
+
+    # Copy to all words that don't have it set
+    if russian_sentence:
+        for word in result.words:
+            if not word.russian_sentence:
+                word.russian_sentence = russian_sentence
 
     return result
 
@@ -417,24 +440,17 @@ def build_vocabulary_pipeline(
 
     # Build lookup: (sentence, lemma) -> context translation
     context_lookup: Dict[tuple[str, str], WordContextTranslation] = {}
-    # Build sentence translation lookup: sentence -> russian_sentence
-    sentence_translation_lookup: Dict[str, str] = {}
-
     for sentence_text, ctx_result in ctx_translations.items():
         # Extract the sentence translation from the first word that has it
         for word_trans in ctx_result.words:
             context_lookup[(sentence_text, word_trans.lemma)] = word_trans
-            # Cache the sentence translation (it's in the first word)
-            if word_trans.russian_sentence and sentence_text not in sentence_translation_lookup:
-                sentence_translation_lookup[sentence_text] = word_trans.russian_sentence
 
     # Create one card per unique lemma (use first occurrence)
     processed_lemmas = set()
 
     for sentence in sentences:
-        sentenceRaw = sentence.sentence
+        sentence_raw = sentence.sentence
         # Get the cached sentence translation for this sentence
-        russian_sentence = sentence_translation_lookup.get(sentenceRaw)
 
         for word in sentence.words:
             # Only create card for first occurrence of each lemma
@@ -444,7 +460,7 @@ def build_vocabulary_pipeline(
             processed_lemmas.add(word.lemma)
 
             # Get context translation from batch result
-            context_trans = context_lookup.get((sentenceRaw, word.lemma))
+            context_trans = context_lookup.get((sentence_raw, word.lemma))
             if not context_trans:
                 print(f"  Warning: No context translation for '{word.lemma}'")
                 continue
@@ -456,16 +472,16 @@ def build_vocabulary_pipeline(
 
             # Create card
             card_id = f"{word.lemma}/{word.part_of_speech}"
-            highlighted_context = highlight_word_in_context(word.original_word, sentenceRaw)
 
             card = VocabularyCard(
                 card_id=card_id,
                 english_lemma=word.lemma,
                 english_original_word=word.original_word,
-                english_context=highlighted_context,
+                english_context=highlight_word_in_context(word.original_word, sentence_raw),
                 part_of_speech=word.part_of_speech,
                 russian_word_translation=context_trans.russian_word,
-                russian_context_translation=russian_sentence,  # Use cached sentence translation
+                russian_context_translation=highlight_word_in_context(context_trans.russian_word,
+                                                                      context_trans.russian_sentence),
                 russian_common_translations=", ".join(general_trans.russian),
                 spanish_word_translation=context_trans.spanish_word,
                 spanish_common_translations=", ".join(general_trans.spanish),

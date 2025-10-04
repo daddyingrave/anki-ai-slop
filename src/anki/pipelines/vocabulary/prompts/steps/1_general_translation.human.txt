@@ -2,6 +2,7 @@ Provide the most common general translations for these English words:
 
 {words_list}
 
-For each word above, provide up to 2 most common translations to Russian and Spanish.
+For each word, provide up to 2 most common translations to Russian and Spanish.
+If a word is a phrasal verb, provide a single translation to Russian and Spanish.
 For proper nouns, return empty lists.
 Return ALL words in a dictionary format mapping lemma to translations.
