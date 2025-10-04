@@ -159,11 +159,3 @@ def create_vocabulary_improved_model_payload() -> Dict[str, Any]:
         "css": get_vocabulary_improved_css(),
         "cardTemplates": get_vocabulary_improved_templates(),
     }
-
-
-__all__ = [
-    "get_vocabulary_improved_fields",
-    "get_vocabulary_improved_css",
-    "get_vocabulary_improved_templates",
-    "create_vocabulary_improved_model_payload",
-]

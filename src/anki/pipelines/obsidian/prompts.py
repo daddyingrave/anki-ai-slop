@@ -43,6 +43,3 @@ def build_step(step_name: str) -> Dict[str, str]:
     system = _assemble(system_tmpl, tokens)
     human = _assemble(human_tmpl, tokens)
     return {"system": system, "human": human}
-
-
-__all__ = ["load_prompt", "build_step"]

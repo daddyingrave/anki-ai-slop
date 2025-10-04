@@ -16,10 +16,3 @@ class Basic:
 sync_anki_cards(deck_name="My Deck", note_type="Basic", cards=[Basic("Q", "A")])
 """
 from .anki_connect import anki_id, AnkiConnectClient, SyncResult, sync_anki_cards
-
-__all__ = [
-    "anki_id",
-    "AnkiConnectClient",
-    "SyncResult",
-    "sync_anki_cards",
-]

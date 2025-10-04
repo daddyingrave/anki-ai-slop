@@ -83,12 +83,3 @@ def vocabulary_card_to_note(card: VocabularyCard) -> VocabularyNote:
         EnglishAudio="",  # Audio will be added later if needed
         EnglishContextAudio="",
     )
-
-
-__all__ = [
-    "Translation",
-    "VocabularyCard",
-    "VocabularyDeck",
-    "VocabularyNote",
-    "vocabulary_card_to_note",
-]

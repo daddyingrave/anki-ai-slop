@@ -6,9 +6,3 @@ extracting text, metadata, and song lyrics.
 """
 
 from .reader import Reader, Processed, new_reader
-
-__all__ = [
-    "Reader",
-    "Processed",
-    "new_reader",
-]

@@ -16,9 +16,3 @@ class AnkiDeck(BaseModel):
     """A collection of Anki cards."""
 
     cards: List[AnkiCard] = Field(..., description="List of Anki cards.")
-
-
-__all__ = [
-    "AnkiCard",
-    "AnkiDeck",
-]

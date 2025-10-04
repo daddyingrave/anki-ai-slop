@@ -7,9 +7,3 @@ with translations to multiple languages using batch translation for efficiency.
 
 from .models import VocabularyCard, VocabularyDeck
 from .chains import build_vocabulary_pipeline
-
-__all__ = [
-    "VocabularyCard",
-    "VocabularyDeck",
-    "build_vocabulary_pipeline",
-]

@@ -31,9 +31,3 @@ def build_batch_word_translation_prompts() -> Dict[str, str]:
         "system": load_prompt("batch_word_translation_system"),
         "human": load_prompt("batch_word_translation_human"),
     }
-
-
-__all__ = [
-    "build_batch_translation_prompts",
-    "build_batch_word_translation_prompts",
-]

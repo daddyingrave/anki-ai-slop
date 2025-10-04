@@ -64,9 +64,3 @@ def validate_deck(deck: VocabularyDeck) -> None:
     if len(card_ids) != len(set(card_ids)):
         duplicates = [cid for cid in card_ids if card_ids.count(cid) > 1]
         raise ValueError(f"Deck contains duplicate card IDs: {set(duplicates)}")
-
-
-__all__ = [
-    "validate_card",
-    "validate_deck",
-]

@@ -24,6 +24,21 @@ from ..models import VocabularyCard
 
 **Exception:** Relative imports are acceptable only within `__init__.py` files for re-exporting.
 
+### ❌ FORBIDDEN: Using `__all__`
+```python
+# DON'T DO THIS
+__all__ = ["build_llm", "retry_invoke"]
+```
+
+**Rationale:**
+- This project uses explicit absolute imports, not wildcard imports (`from module import *`)
+- `__all__` only controls wildcard imports, which we never use
+- It adds maintenance overhead with zero benefit
+- Creates the illusion of access control that doesn't actually exist in Python
+- If something shouldn't be imported, prefix it with `_` to mark it as private
+
+**When to use `__all__`:** NEVER in this codebase. Our explicit import style makes it redundant.
+
 ### ✅ DO: Place ALL imports at the top of the file
 ```python
 # Good
