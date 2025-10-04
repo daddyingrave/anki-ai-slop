@@ -375,7 +375,53 @@ if not cards:
     pass
 ```
 
-## 13. AI Assistant Specific Guidelines
+## 13. LLM Prompts and Schema Management
+
+### ⚠️ IMPORTANT: Avoid hardcoded JSON examples in prompts
+
+**Problem:** JSON schemas in prompts can become outdated when Pydantic models change.
+
+**Bad Practice:**
+```
+# In prompt file:
+Example output: {
+  "russian": {"word_translation": "...", "context_translation": "..."},
+  "spanish": {"word_translation": "..."}
+}
+```
+
+**Issues:**
+- Manual sync required when models change
+- Silent failures (LLM learns wrong format)
+- No compile-time validation
+
+**Good Practice:** Use conceptual examples without exact JSON structure
+```
+# In prompt file:
+Note: These examples show the translation logic, not exact JSON structure (which is provided by the system).
+
+Example 1 - Regular verb:
+Input: word="flexed", context="..."
+Expected:
+  - Russian word: "размял"
+  - Russian sentence: "Отбросив свой черный плащ..."
+  - Spanish word: "flexionó"
+```
+
+**Benefits:**
+- ✅ Schema is enforced by `with_structured_output(Model)` - single source of truth
+- ✅ Examples teach translation logic, not JSON structure
+- ✅ Model changes don't break prompts
+- ✅ More maintainable
+
+**When schemas must be in prompts:**
+If you absolutely need schema info in prompts, generate it dynamically:
+```python
+schema = MyModel.model_json_schema()
+prompt_with_schema = f"{base_prompt}\n\nSchema:\n{json.dumps(schema, indent=2)}"
+```
+
+## 14. AI Assistant Specific Guidelines
 
 ### When refactoring:
 1. **Always read files before editing** - understand context
