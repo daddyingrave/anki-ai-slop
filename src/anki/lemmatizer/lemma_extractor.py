@@ -52,8 +52,28 @@ class PhrasalVerbEntry(TypedDict):
     """Structure for storing information about a phrasal verb occurrence in a sentence."""
     sentence: str
     original_text: str
-    verb: str
-    particle: str
+
+
+class WordInSentenceDict(TypedDict):
+    """Type definition for a word occurrence in a sentence."""
+    lemma: str
+    original_word: str
+    part_of_speech: str
+    is_phrasal_verb: bool
+
+
+class SentenceContextDict(TypedDict, total=False):
+    """Type definition for sentence context."""
+    sentence: str
+    previous_sentence: Optional[str]
+    next_sentence: Optional[str]
+
+
+class SentenceWithWordsDict(TypedDict):
+    """Type definition for a sentence with all words to translate."""
+    sentence: str
+    words: List[WordInSentenceDict]
+    context: Optional[SentenceContextDict]
 
 
 class LemmaExtractor:
@@ -125,55 +145,6 @@ class LemmaExtractor:
         """
         explanation = spacy.explain(pos_tag)
         return explanation.lower() if explanation else pos_tag.lower()
-
-    def process_lemmas(self, doc) -> Dict[str, List[LemmaEntry]]:
-        """
-        Process a spaCy document and extract lemmas.
-
-        Args:
-            doc: A spaCy document
-
-        Returns:
-            Dict[str, List[LemmaEntry]]: A mapping of lemmas to lists of sentences with original words
-        """
-        lemma_to_sentences: Dict[str, List[LemmaEntry]] = defaultdict(list)
-
-        # Process each sentence
-        for sent in doc.sents:
-            sentence_text: str = sent.text.strip()
-
-            # Skip empty sentences
-            if not sentence_text:
-                continue
-
-            # Process each token in the sentence for lemmas
-            for token in sent:
-                # Skip punctuation and whitespace
-                if token.is_punct or token.is_space:
-                    continue
-
-                # Get the lemma and original word
-                # Don't lowercase proper nouns
-                lemma: str = token.lemma_ if token.pos_ == "PROPN" else token.lemma_.lower()
-                original_word: str = token.text
-
-                # Skip if a lemma is empty
-                if not lemma:
-                    continue
-
-                # Add the sentence to the mapping
-                entry: LemmaEntry = {
-                    "sentence": sentence_text,
-                    "original_word": original_word,
-                    "part_of_speech": self.get_human_readable_pos(token.pos_)
-                }
-
-                # Only add if this exact sentence isn't already in the list for this lemma
-                if not any(el["sentence"] == sentence_text and el["original_word"] == original_word
-                           for el in lemma_to_sentences[lemma]):
-                    lemma_to_sentences[lemma].append(entry)
-
-        return dict(lemma_to_sentences)
 
     def process_phrasal_verbs(self, doc, phrasal_verbs_path: Optional[str] = None) -> Dict[str, List[PhrasalVerbEntry]]:
         """
@@ -290,17 +261,16 @@ class LemmaExtractor:
 
         return dict(phrasal_verb_to_sentences)
 
-    def process_file(self, file_path: str, phrasal_verbs_path: Optional[str] = None) -> Tuple[
-        Dict[str, List[LemmaEntry]], Dict[str, List[PhrasalVerbEntry]], str]:
+    def process_file(self, file_path: str, phrasal_verbs_path: Optional[str] = None) -> List[SentenceWithWordsDict]:
         """
-        Process a text file and create mappings of lemmas and phrasal verbs to sentences.
+        Process a text file and return words grouped by sentence (optimized for batch translation).
 
         Args:
             file_path (str): Path to the text file to process
             phrasal_verbs_path (Optional[str]): Path to the phrasal verbs file (optional)
 
         Returns:
-            Tuple: (lemma_map, phrasal_verb_map, text)
+            List[SentenceWithWordsDict]: List of sentences with their words and context
         """
         # Check if file exists
         if not os.path.isfile(file_path):
@@ -312,13 +282,85 @@ class LemmaExtractor:
         print("Processing text with spaCy...")
         doc = self.nlp(file_content)
 
+        # Build mapping: sentence -> list of words (directly)
+        sentence_to_words: Dict[str, List[WordInSentenceDict]] = defaultdict(list)
+
         # Process lemmas
-        processed_lemmas = self.process_lemmas(doc)
+        for sent in doc.sents:
+            sentence_text: str = sent.text.strip()
+            if not sentence_text:
+                continue
+
+            for token in sent:
+                if token.is_punct or token.is_space:
+                    continue
+
+                lemma: str = token.lemma_ if token.pos_ == "PROPN" else token.lemma_.lower()
+                if not lemma:
+                    continue
+
+                word_info: WordInSentenceDict = {
+                    "lemma": lemma,
+                    "original_word": token.text,
+                    "part_of_speech": self.get_human_readable_pos(token.pos_),
+                    "is_phrasal_verb": False,
+                }
+
+                # Avoid duplicates
+                if not any(
+                    w["lemma"] == word_info["lemma"] and w["original_word"] == word_info["original_word"]
+                    for w in sentence_to_words[sentence_text]
+                ):
+                    sentence_to_words[sentence_text].append(word_info)
 
         # Process phrasal verbs
-        processed_phrasal_verbs = self.process_phrasal_verbs(doc, phrasal_verbs_path)
+        phrasal_verbs_map = self._extract_phrasal_verbs(doc, phrasal_verbs_path)
+        for pv_key, entries in phrasal_verbs_map.items():
+            for entry in entries:
+                sentence_text = entry["sentence"]
+                word_info: WordInSentenceDict = {
+                    "lemma": pv_key,
+                    "original_word": entry["original_text"],
+                    "part_of_speech": "phrasal verb",
+                    "is_phrasal_verb": True,
+                }
 
-        return processed_lemmas, processed_phrasal_verbs, file_content
+                # Avoid duplicates
+                if not any(
+                    w["lemma"] == word_info["lemma"] and w["original_word"] == word_info["original_word"]
+                    for w in sentence_to_words[sentence_text]
+                ):
+                    sentence_to_words[sentence_text].append(word_info)
+
+        # Build sentence list for context extraction
+        sentences = [s.strip() for s in file_content.split('\n') if s.strip()]
+        sentence_index = {sent: idx for idx, sent in enumerate(sentences)}
+
+        # Build result with context
+        result: List[SentenceWithWordsDict] = []
+        for sentence, words in sentence_to_words.items():
+            context: Optional[SentenceContextDict] = None
+            if sentence in sentence_index:
+                idx = sentence_index[sentence]
+                prev_sent = sentences[idx - 1] if idx > 0 else None
+                next_sent = sentences[idx + 1] if idx < len(sentences) - 1 else None
+                context = {
+                    "sentence": sentence,
+                    "previous_sentence": prev_sent,
+                    "next_sentence": next_sent,
+                }
+
+            result.append({
+                "sentence": sentence,
+                "words": words,
+                "context": context,
+            })
+
+        return result
+
+    def _extract_phrasal_verbs(self, doc, phrasal_verbs_path: Optional[str] = None) -> Dict[str, List[PhrasalVerbEntry]]:
+        """Extract phrasal verbs from a spaCy document (internal helper)."""
+        return self.process_phrasal_verbs(doc, phrasal_verbs_path)
 
 
 __all__ = [
@@ -327,4 +369,7 @@ __all__ = [
     "ModelType",
     "LemmaEntry",
     "PhrasalVerbEntry",
+    "WordInSentenceDict",
+    "SentenceContextDict",
+    "SentenceWithWordsDict",
 ]

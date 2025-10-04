@@ -4,7 +4,6 @@ LangChain chains for generating vocabulary cards from lemmatizer output.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 from typing import Dict, List, cast
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -41,86 +40,6 @@ class SentenceWithWords(BaseModel):
     sentence: str = Field(..., description="The sentence text")
     words: List[WordInSentence] = Field(..., description="Words to translate in this sentence")
     context: SentenceContext | None = Field(None, description="Context sentences")
-
-
-def transform_to_sentence_map(
-        lemma_map: Dict[str, List[Dict[str, str]]],
-        phrasal_verb_map: Dict[str, List[Dict[str, str]]],
-        text: str,
-) -> List[SentenceWithWords]:
-    """Transform lemma_map and phrasal_verb_map into a sentence-grouped structure.
-
-    This enables batch processing: translate all words in a sentence together.
-
-    Args:
-        lemma_map: Maps lemma -> list of occurrences with {sentence, original_word, part_of_speech}
-        phrasal_verb_map: Maps phrasal_verb -> list of occurrences with {sentence, original_text, ...}
-        text: Full text to extract sentence context
-
-    Returns:
-        List of SentenceWithWords, each containing all words to translate in that sentence
-    """
-    # Build reverse mapping: sentence -> list of words
-    sentence_to_words: Dict[str, List[WordInSentence]] = defaultdict(list)
-
-    # Process regular lemmas
-    for lemma, entries in lemma_map.items():
-        for entry in entries:
-            sentence = entry["sentence"]
-            word_info = WordInSentence(
-                lemma=lemma,
-                original_word=entry["original_word"],
-                part_of_speech=entry["part_of_speech"],
-                is_phrasal_verb=False,
-            )
-            # Avoid duplicates
-            if not any(w.lemma == word_info.lemma and w.original_word == word_info.original_word
-                       for w in sentence_to_words[sentence]):
-                sentence_to_words[sentence].append(word_info)
-
-    # Process phrasal verbs
-    for pv_key, entries in phrasal_verb_map.items():
-        for entry in entries:
-            sentence = entry["sentence"]
-            word_info = WordInSentence(
-                lemma=pv_key,
-                original_word=entry["original_text"],
-                part_of_speech="phrasal verb",
-                is_phrasal_verb=True,
-            )
-            # Avoid duplicates
-            if not any(w.lemma == word_info.lemma and w.original_word == word_info.original_word
-                       for w in sentence_to_words[sentence]):
-                sentence_to_words[sentence].append(word_info)
-
-    # Split text into sentences for context extraction
-    sentences = [s.strip() for s in text.split('\n') if s.strip()]
-
-    # Build sentence index for fast lookup
-    sentence_index = {sent: idx for idx, sent in enumerate(sentences)}
-
-    # Build result with context
-    result: List[SentenceWithWords] = []
-    for sentence, words in sentence_to_words.items():
-        # Find context sentences
-        context = None
-        if sentence in sentence_index:
-            idx = sentence_index[sentence]
-            prev_sent = sentences[idx - 1] if idx > 0 else None
-            next_sent = sentences[idx + 1] if idx < len(sentences) - 1 else None
-            context = SentenceContext(
-                sentence=sentence,
-                previous_sentence=prev_sent,
-                next_sentence=next_sent,
-            )
-
-        result.append(SentenceWithWords(
-            sentence=sentence,
-            words=words,
-            context=context,
-        ))
-
-    return result
 
 
 class ContextTranslationResponse(BaseModel):
@@ -342,16 +261,43 @@ def build_vocabulary_pipeline(
         raise ValueError(f"Invalid model_type: {model_type}")
 
     extractor = LemmaExtractor(lang_enum, model_enum)
-    lemma_map, phrasal_verb_map, text = extractor.process_file(
-        input_file,
-        phrasal_verbs_file
-    )
 
-    print(f"Extracted {len(lemma_map)} lemmas and {len(phrasal_verb_map)} phrasal verbs")
+    # Step 2: Extract and group words by sentence
+    print("Extracting lemmas and grouping by sentence...")
+    sentence_groups_raw = extractor.process_file(input_file, phrasal_verbs_file)
 
-    # Step 2: Group words by sentence for batch translation
-    print("Grouping words by sentence for batch translation...")
-    sentence_groups = transform_to_sentence_map(lemma_map, phrasal_verb_map, text)
+    # Convert TypedDict to Pydantic models
+    sentence_groups: List[SentenceWithWords] = []
+    for group in sentence_groups_raw:
+        words = [
+            WordInSentence(
+                lemma=w["lemma"],
+                original_word=w["original_word"],
+                part_of_speech=w["part_of_speech"],
+                is_phrasal_verb=w["is_phrasal_verb"],
+            )
+            for w in group["words"]
+        ]
+
+        context = None
+        if group["context"]:
+            context = SentenceContext(
+                sentence=group["context"]["sentence"],
+                previous_sentence=group["context"].get("previous_sentence"),
+                next_sentence=group["context"].get("next_sentence"),
+            )
+
+        sentence_groups.append(SentenceWithWords(
+            sentence=group["sentence"],
+            words=words,
+            context=context,
+        ))
+
+    # Count unique lemmas for reporting
+    all_lemmas = {w.lemma for group in sentence_groups for w in group.words if not w.is_phrasal_verb}
+    all_phrasal_verbs = {w.lemma for group in sentence_groups for w in group.words if w.is_phrasal_verb}
+
+    print(f"Extracted {len(all_lemmas)} lemmas and {len(all_phrasal_verbs)} phrasal verbs")
     print(f"Grouped into {len(sentence_groups)} unique sentences")
 
     # Step 3: Batch translate words by sentence (ONE LLM call per sentence for all words)
@@ -462,13 +408,6 @@ def build_vocabulary_pipeline(
             cards.append(card)
 
     print(f"Generated {len(cards)} vocabulary cards total")
-    print(f"Context translations: {len(sentence_groups)} LLM calls (one per sentence)")
-    print(f"General translations: 1 LLM call (batch)")
-    total_llm_calls = len(sentence_groups) + 1  # +1 for batch general translation
-    old_approach_calls = 2 * (len(lemma_map) + len(phrasal_verb_map))
-    if old_approach_calls > 0:
-        savings = 100 * (1 - total_llm_calls / old_approach_calls)
-        print(f"Efficiency: {savings:.1f}% fewer LLM calls vs old approach")
 
     return cards
 
@@ -485,7 +424,6 @@ __all__ = [
     "BatchWordContextTranslation",
     "BatchSentenceTranslationResponse",
     # Helper functions
-    "transform_to_sentence_map",
     "highlight_word_in_context",
     # Batch translation
     "batch_translate_sentence_words",
