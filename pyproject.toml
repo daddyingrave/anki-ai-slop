@@ -4,14 +4,18 @@ version = "0.1.0"
 description = "AI utilites to simplifiy some anki interactions"
 requires-python = ">=3.13"
 dependencies = [
-  "hatchling>=1.18",
-  "langchain==0.3.27",
-  "langchain-community==0.3.30",
-  "langchain-google-genai==2.1.12",
-  "pydantic==2.11.10",
-  "pyyaml==6.0.3",
-  "Pillow>=10.0.0",
-  "mistralai>=1.0.0",
+    "hatchling>=1.18",
+    "langchain==0.3.27",
+    "langchain-community==0.3.30",
+    "langchain-google-genai==2.1.12",
+    "pydantic==2.11.10",
+    "pyyaml==6.0.3",
+    "Pillow>=10.0.0",
+    "mistralai>=1.0.0",
+    "spacy>=3.8.2",
+    "spacy-curated-transformers>=0.3.0",
+    "PyPDF2>=3.0.0",
+    "pysrt>=1.1.0",
 ]
 
 [build-system]
@@ -19,4 +23,7 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/anki", "src/mistral_ocr"]
+packages = ["src/anki", "src/mistral_ocr", "src/pv_pdf_to_csv", "src/subs"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"src/lemmatizer/phrasal_verbs.csv" = "share/lemmatizer/phrasal_verbs.csv"
