@@ -14,6 +14,7 @@ from anki.pipelines.vocabulary.prompts import build_translation_prompts, build_w
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
 from anki.config_models import StepConfig
+from anki.lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
 
 
 class ContextTranslationResponse(BaseModel):
@@ -264,8 +265,6 @@ def build_vocabulary_pipeline(
     Returns:
         List of VocabularyCard objects
     """
-    from anki.lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
-
     # Step 1: Extract lemmas using the lemmatizer
     print(f"Processing file with lemmatizer: {input_file}")
     print(f"Language: {language}, Model: {model_type}")

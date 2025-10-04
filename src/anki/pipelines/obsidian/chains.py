@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import html
 import re
+from pathlib import Path
 from typing import cast
 
 from langchain_core.prompts import ChatPromptTemplate
 
 from anki.pipelines.obsidian.models import AnkiDeck
 from anki.pipelines.obsidian.prompts import build_step
+from anki.pipelines.obsidian.validators import validate_deck
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
 from anki.config_models import StepConfig, ObsidianPipelineConfig
@@ -76,7 +78,6 @@ def review_anki_deck(
             "LLM did not return structured AnkiDeck during review. Check the model, prompts, and inputs."
         )
     result = _normalize_math_delimiters(result)
-    from anki.pipelines.obsidian.validators import validate_deck
     validate_deck(result)
     return result
 
@@ -101,8 +102,6 @@ def build_obsidian_pipeline(
     Returns:
         List of tuples containing (deck_name, AnkiDeck)
     """
-    from pathlib import Path
-
     vault_path = Path(vault_dir)
     if not vault_path.exists() or not vault_path.is_dir():
         raise ValueError(f"vault_dir does not exist or is not a directory: {vault_dir}")

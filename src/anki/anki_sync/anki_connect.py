@@ -34,6 +34,8 @@ import json
 import sys
 import urllib.request
 
+from anki.anki_sync.vocabulary_improved import create_vocabulary_improved_model_payload
+
 ANKI_CONNECT_VERSION = 6
 
 
@@ -158,8 +160,6 @@ def ensure_vocabulary_improved_model(client: AnkiConnectClient) -> None:
     Raises:
         RuntimeError: If model creation fails
     """
-    from .vocabulary_improved import create_vocabulary_improved_model_payload
-
     # Check if model already exists
     existing_models = client.model_names()
     if "Vocabulary Improved" in existing_models:
