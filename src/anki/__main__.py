@@ -5,7 +5,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import yaml
 from pydantic import ValidationError
@@ -13,10 +13,9 @@ from pydantic import ValidationError
 from .anki_sync.anki_connect import anki_id, sync_anki_cards
 from .common.observability import enable_cache
 from .config_models import RunConfig, ObsidianToAnkiPipelineConfig, LemmatizerToAnkiPipelineConfig
-from .obsidian_to_anki.chains import build_deck_pipeline
-from .obsidian_to_anki.models import AnkiDeck
-from .lemmatizer_to_anki.chains import generate_vocabulary_card
-from .lemmatizer_to_anki.models import vocabulary_card_to_note, VocabularyCard
+from .obsidian_to_anki.chains import build_obsidian_pipeline
+from .lemmatizer_to_anki.chains import build_vocabulary_pipeline
+from .lemmatizer_to_anki.models import vocabulary_card_to_note
 
 
 def _require_google_key() -> None:
@@ -26,32 +25,6 @@ def _require_google_key() -> None:
             "Please export it before running, e.g.:\n"
             "  export GOOGLE_API_KEY=your_key_here"
         )
-
-
-def _maybe_write(path: Optional[Path], data: object) -> None:
-    if path is None:
-        return
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _discover_note_files(vault_dir: Path, notes_path: str) -> List[Path]:
-    base = Path(vault_dir)
-    candidate = base / notes_path
-    if candidate.is_file():
-        return [candidate]
-    if candidate.is_dir():
-        return sorted(p for p in candidate.rglob("*.md") if p.is_file())
-    raise FileNotFoundError(f"notes_path not found under vault_dir: {candidate}")
-
-
-def _derive_deck_name(vault_dir: Path, note_file: Path) -> str:
-    rel = note_file.relative_to(vault_dir)
-    parts = list(rel.parts)
-    if not parts:
-        return note_file.stem
-    parts[-1] = Path(parts[-1]).stem
-    return "::".join(parts)
 
 
 @dataclass
@@ -88,24 +61,18 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
         if pipeline_cfg is None:
             raise SystemExit("Missing pipelines.obsidian_to_anki configuration after normalization")
 
-        vault_dir = Path(pipeline_cfg.vault_dir)
-        if not vault_dir.exists() or not vault_dir.is_dir():
-            raise SystemExit(f"vault_dir does not exist or is not a directory: {vault_dir}")
+        # Run the obsidian pipeline
+        deck_results = build_obsidian_pipeline(
+            vault_dir=pipeline_cfg.vault_dir,
+            notes_path=pipeline_cfg.notes_path,
+            pipeline_cfg=pipeline_cfg,
+        )
 
-        note_files = _discover_note_files(vault_dir, pipeline_cfg.notes_path)
-        multiple = len(note_files) > 1
-
-        # After pipeline: sync to Anki via AnkiConnect
+        # Sync to Anki via AnkiConnect
         note_type = os.getenv("ANKI_NOTE_TYPE", "Basic")
         anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
 
-        all_decks: List[AnkiDeck] = []
-        for nf in note_files:
-            article = nf.read_text(encoding="utf-8")
-            deck: AnkiDeck = build_deck_pipeline(article, pipeline=pipeline_cfg)
-
-            deck_name = _derive_deck_name(vault_dir, nf)
-
+        for deck_name, deck in deck_results:
             notes = [BasicNote(Front=c.Front, Back=c.Back) for c in deck.cards]
             sync_anki_cards(
                 deck_name=deck_name,
@@ -113,15 +80,12 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
                 cards=notes,
                 anki_connect_url=anki_url,
             )
-            all_decks.append(deck)
 
             Path(f"out/{deck_name}.json").write_text(
                 json.dumps(deck.model_dump(), ensure_ascii=False, indent=2),
                 encoding="utf-8")
 
     elif pipeline_name == "lemmatizer_to_anki":
-        from .lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
-
         pipeline_cfg: LemmatizerToAnkiPipelineConfig | None = cfg.pipelines.get("lemmatizer_to_anki")
         if pipeline_cfg is None:
             raise SystemExit("Missing pipelines.lemmatizer_to_anki configuration after normalization")
@@ -139,82 +103,16 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
             else:
                 print(f"Warning: phrasal_verbs_file not found: {pv_file}")
 
-        # Step 1: Extract lemmas using the lemmatizer
-        print(f"Processing file with lemmatizer: {input_file}")
-        print(f"Language: {pipeline_cfg.language}, Model: {pipeline_cfg.model_type}")
-
-        try:
-            lang_enum = LanguageMnemonic(pipeline_cfg.language)
-        except ValueError:
-            raise SystemExit(f"Invalid language: {pipeline_cfg.language}")
-
-        try:
-            model_type_map = {
-                "EFFICIENT": ModelType.EFFICIENT,
-                "ACCURATE": ModelType.ACCURATE,
-                "TRANSFORMER": ModelType.TRANSFORMER,
-            }
-            model_enum = model_type_map[pipeline_cfg.model_type.upper()]
-        except KeyError:
-            raise SystemExit(f"Invalid model_type: {pipeline_cfg.model_type}")
-
-        extractor = LemmaExtractor(lang_enum, model_enum)
-        lemma_map, phrasal_verb_map, text = extractor.process_file(
-            str(input_file),
-            phrasal_verbs_path
+        # Run the vocabulary pipeline
+        cards = build_vocabulary_pipeline(
+            input_file=str(input_file),
+            language=pipeline_cfg.language,
+            model_type=pipeline_cfg.model_type,
+            phrasal_verbs_file=phrasal_verbs_path,
+            translate_step=pipeline_cfg.translate,
         )
 
-        print(f"Extracted {len(lemma_map)} lemmas and {len(phrasal_verb_map)} phrasal verbs")
-
-        # Step 2: Generate vocabulary cards with translations
-        cards: List[VocabularyCard] = []
-        total_lemmas = len(lemma_map)
-
-        print(f"Generating vocabulary cards with translations...")
-        for idx, (lemma, entries) in enumerate(lemma_map.items(), 1):
-            if not entries:
-                continue
-
-            first_entry = entries[0]
-
-            try:
-                card = generate_vocabulary_card(
-                    lemma=lemma,
-                    original_word=first_entry["original_word"],
-                    context=first_entry["sentence"],
-                    part_of_speech=first_entry["part_of_speech"],
-                    step=pipeline_cfg.translate,
-                )
-                cards.append(card)
-                if idx % 10 == 0 or idx == total_lemmas:
-                    print(f"  Progress: {idx}/{total_lemmas} cards generated")
-            except Exception as e:
-                print(f"  Error generating card for '{lemma}': {e}")
-                continue
-
-        # Process phrasal verbs similarly
-        for pv_key, entries in phrasal_verb_map.items():
-            if not entries:
-                continue
-
-            first_entry = entries[0]
-
-            try:
-                card = generate_vocabulary_card(
-                    lemma=pv_key,
-                    original_word=first_entry["original_text"],
-                    context=first_entry["sentence"],
-                    part_of_speech="phrasal verb",
-                    step=pipeline_cfg.translate,
-                )
-                cards.append(card)
-            except Exception as e:
-                print(f"  Error generating card for phrasal verb '{pv_key}': {e}")
-                continue
-
-        print(f"Generated {len(cards)} vocabulary cards total")
-
-        # Step 3: Sync to Anki
+        # Sync to Anki
         anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
         note_type = "Vocabulary Improved"
 

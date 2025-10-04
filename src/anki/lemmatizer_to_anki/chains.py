@@ -48,11 +48,11 @@ def highlight_word_in_context(word: str, context: str) -> str:
 
 
 def translate_word_in_context(
-    word: str,
-    original_word: str,
-    context: str,
-    part_of_speech: str,
-    step: StepConfig,
+        word: str,
+        original_word: str,
+        context: str,
+        part_of_speech: str,
+        step: StepConfig,
 ) -> ContextTranslationResponse:
     """Translate a word considering its context.
 
@@ -95,9 +95,9 @@ def translate_word_in_context(
 
 
 def translate_word_general(
-    word: str,
-    part_of_speech: str,
-    step: StepConfig,
+        word: str,
+        part_of_speech: str,
+        step: StepConfig,
 ) -> WordTranslationResponse:
     """Get general translations for a word (not context-specific).
 
@@ -140,11 +140,11 @@ def translate_word_general(
 
 
 def generate_vocabulary_card(
-    lemma: str,
-    original_word: str,
-    context: str,
-    part_of_speech: str,
-    step: StepConfig,
+        lemma: str,
+        original_word: str,
+        context: str,
+        part_of_speech: str,
+        step: StepConfig,
 ) -> VocabularyCard:
     """Generate a complete vocabulary card for a lemma.
 
@@ -202,8 +202,8 @@ def generate_vocabulary_card(
 
 
 def process_lemma_batch(
-    lemma_entries: Dict[str, List[Dict[str, str]]],
-    step: StepConfig,
+        lemma_entries: Dict[str, List[Dict[str, str]]],
+        step: StepConfig,
 ) -> VocabularyDeck:
     """Process a batch of lemma entries and generate vocabulary cards.
 
@@ -240,6 +240,110 @@ def process_lemma_batch(
     return VocabularyDeck(cards=cards)
 
 
+def build_vocabulary_pipeline(
+        input_file: str,
+        language: str,
+        model_type: str,
+        phrasal_verbs_file: str | None,
+        translate_step: StepConfig,
+) -> List[VocabularyCard]:
+    """Complete pipeline to process a text file and generate vocabulary cards.
+
+    This pipeline:
+    1. Extracts lemmas using the lemmatizer
+    2. Generates vocabulary cards with translations
+    3. Returns a list of VocabularyCard objects
+
+    Args:
+        input_file: Path to the input text file
+        language: Language code (e.g., "EN")
+        model_type: Model type ("EFFICIENT", "ACCURATE", "TRANSFORMER")
+        phrasal_verbs_file: Optional path to phrasal verbs CSV file
+        translate_step: Step configuration for translation
+
+    Returns:
+        List of VocabularyCard objects
+    """
+    from ..lemmatizer import LemmaExtractor, LanguageMnemonic, ModelType
+
+    # Step 1: Extract lemmas using the lemmatizer
+    print(f"Processing file with lemmatizer: {input_file}")
+    print(f"Language: {language}, Model: {model_type}")
+
+    try:
+        lang_enum = LanguageMnemonic(language)
+    except ValueError:
+        raise ValueError(f"Invalid language: {language}")
+
+    try:
+        model_type_map = {
+            "EFFICIENT": ModelType.EFFICIENT,
+            "ACCURATE": ModelType.ACCURATE,
+            "TRANSFORMER": ModelType.TRANSFORMER,
+        }
+        model_enum = model_type_map[model_type.upper()]
+    except KeyError:
+        raise ValueError(f"Invalid model_type: {model_type}")
+
+    extractor = LemmaExtractor(lang_enum, model_enum)
+    lemma_map, phrasal_verb_map, text = extractor.process_file(
+        input_file,
+        phrasal_verbs_file
+    )
+
+    print(f"Extracted {len(lemma_map)} lemmas and {len(phrasal_verb_map)} phrasal verbs")
+
+    # Step 2: Generate vocabulary cards with translations
+    cards: List[VocabularyCard] = []
+    total_lemmas = len(lemma_map)
+
+    print(f"Generating vocabulary cards with translations...")
+    for idx, (lemma, entries) in enumerate(lemma_map.items(), 1):
+        if not entries:
+            continue
+
+        first_entry = entries[0]
+
+        try:
+            card = generate_vocabulary_card(
+                lemma=lemma,
+                original_word=first_entry["original_word"],
+                context=first_entry["sentence"],
+                part_of_speech=first_entry["part_of_speech"],
+                step=translate_step,
+            )
+            cards.append(card)
+            if idx % 10 == 0 or idx == total_lemmas:
+                print(f"  Progress: {idx}/{total_lemmas} cards generated")
+        except Exception as e:
+            print(f"  Error generating card for '{lemma}': {e}")
+            continue
+
+    # Process phrasal verbs similarly
+    for pv_key, entries in phrasal_verb_map.items():
+        if not entries:
+            continue
+
+        first_entry = entries[0]
+
+        try:
+            card = generate_vocabulary_card(
+                lemma=pv_key,
+                original_word=first_entry["original_text"],
+                context=first_entry["sentence"],
+                part_of_speech="phrasal verb",
+                step=translate_step,
+            )
+            cards.append(card)
+        except Exception as e:
+            print(f"  Error generating card for phrasal verb '{pv_key}': {e}")
+            continue
+
+    print(f"Generated {len(cards)} vocabulary cards total")
+
+    return cards
+
+
 __all__ = [
     "ContextTranslationResponse",
     "WordTranslationResponse",
@@ -248,4 +352,5 @@ __all__ = [
     "translate_word_general",
     "generate_vocabulary_card",
     "process_lemma_batch",
+    "build_vocabulary_pipeline",
 ]

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import cast
-import re
 import html
+import re
+from typing import cast
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -81,21 +81,72 @@ def review_anki_deck(
     return result
 
 
-def build_deck_pipeline(
-        article: str,
-        pipeline: ObsidianToAnkiPipelineConfig,
-) -> AnkiDeck:
-    """Two-stage pipeline: generate → review."""
-    initial_deck = generate_anki_deck(
-        article,
-        step=pipeline.generate,
-    )
-    reviewed_deck = review_anki_deck(
-        article,
-        initial_deck,
-        step=pipeline.review,
-    )
-    return reviewed_deck
+def build_obsidian_pipeline(
+        vault_dir: str,
+        notes_path: str,
+        pipeline_cfg: ObsidianToAnkiPipelineConfig,
+) -> list[tuple[str, AnkiDeck]]:
+    """Complete pipeline to process Obsidian notes and generate Anki decks.
+
+    This pipeline:
+    1. Discovers note files in the vault
+    2. Processes each file through the deck generation pipeline
+    3. Returns a list of (deck_name, deck) tuples
+
+    Args:
+        vault_dir: Path to the Obsidian vault directory
+        notes_path: Path to notes (file or directory) relative to vault_dir
+        pipeline_cfg: Pipeline configuration for obsidian_to_anki
+
+    Returns:
+        List of tuples containing (deck_name, AnkiDeck)
+    """
+    from pathlib import Path
+
+    vault_path = Path(vault_dir)
+    if not vault_path.exists() or not vault_path.is_dir():
+        raise ValueError(f"vault_dir does not exist or is not a directory: {vault_dir}")
+
+    # Discover note files
+    def _discover_note_files(vault_dir: Path, notes_path: str) -> list[Path]:
+        base = Path(vault_dir)
+        candidate = base / notes_path
+        if candidate.is_file():
+            return [candidate]
+        if candidate.is_dir():
+            return sorted(p for p in candidate.rglob("*.md") if p.is_file())
+        raise FileNotFoundError(f"notes_path not found under vault_dir: {candidate}")
+
+    def _derive_deck_name(vault_dir: Path, note_file: Path) -> str:
+        rel = note_file.relative_to(vault_dir)
+        parts = list(rel.parts)
+        if not parts:
+            return note_file.stem
+        parts[-1] = Path(parts[-1]).stem
+        return "::".join(parts)
+
+    note_files = _discover_note_files(vault_path, notes_path)
+
+    results: list[tuple[str, AnkiDeck]] = []
+    for nf in note_files:
+        article = nf.read_text(encoding="utf-8")
+
+        initial_deck = generate_anki_deck(
+            article,
+            step=pipeline.generate,
+        )
+        reviewed_deck = review_anki_deck(
+            article,
+            initial_deck,
+            step=pipeline.review,
+        )
+
+        deck: AnkiDeck = reviewed_deck
+        deck_name = _derive_deck_name(vault_path, nf)
+        results.append((deck_name, deck))
+
+    return results
+
 
 def _normalize_math_delimiters(deck: AnkiDeck) -> AnkiDeck:
     """Normalize card text fields for MathJax and formatting cleanliness.
@@ -127,10 +178,12 @@ def _normalize_math_delimiters(deck: AnkiDeck) -> AnkiDeck:
             # 1) Collapse for MathJax delimiters
             s = s.replace("\\\\(", "\\(").replace("\\\\)", "\\)")
             s = s.replace("\\\\[", "\\[").replace("\\\\]", "\\]")
+
             # 2) Fenced code blocks -> HTML
             def _fenced_repl(m: re.Match) -> str:
                 code = m.group(1)
                 return f"<pre><code>{_escape_html(code)}</code></pre>"
+
             s = fenced.sub(_fenced_repl, s)
             # 3) Inline code -> HTML
             s = inline.sub(lambda m: f"<code>{_escape_html(m.group(1))}</code>", s)
