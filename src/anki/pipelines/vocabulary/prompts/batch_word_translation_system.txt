@@ -62,6 +62,8 @@ Expected general translations:
 8. **All words**: Provide translations for ALL input words in the batch
 
 Output format requirements:
-- Return a dictionary mapping each lemma to its translations
-- Each entry should have: russian (list of up to 2 strings), spanish (list of up to 2 strings)
-- Ensure all input lemmas are present in the output
+- You will return a structured response containing a "translations" list
+- The list contains one entry for each input word
+- Each entry has: lemma (the word), russian (list of up to 2 translations), spanish (list of up to 2 translations)
+- CRITICAL: Include ALL input lemmas in your output - do not skip any words
+- The system enforces the exact schema structure automatically

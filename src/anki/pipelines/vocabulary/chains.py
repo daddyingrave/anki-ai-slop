@@ -15,6 +15,7 @@ from anki.pipelines.vocabulary.prompts import (
     build_translation_prompts,
     build_word_translation_prompts,
     build_batch_translation_prompts,
+    build_batch_word_translation_prompts,
 )
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
@@ -134,6 +135,24 @@ class WordTranslationResponse(BaseModel):
     """Response model for general word translation."""
     russian: List[str] = Field(default_factory=list, description="Common Russian translations (up to 2)")
     spanish: List[str] = Field(default_factory=list, description="Common Spanish translations (up to 2)")
+
+
+class SingleWordGeneralTranslation(BaseModel):
+    """Translation for a single word (general meanings, not context-specific)."""
+    lemma: str = Field(..., description="The word being translated")
+    russian: List[str] = Field(default_factory=list, description="Common Russian translations (up to 2)")
+    spanish: List[str] = Field(default_factory=list, description="Common Spanish translations (up to 2)")
+
+
+class BatchWordTranslationResponse(BaseModel):
+    """Response model for batch general word translation.
+
+    Contains a list of translations for multiple words.
+    """
+    translations: List[SingleWordGeneralTranslation] = Field(
+        ...,
+        description="List of translations for each word in the batch"
+    )
 
 
 # Batch translation models
@@ -258,6 +277,52 @@ def translate_word_general(
 
     if result is None:
         raise RuntimeError(f"LLM did not return general translation for word '{word}'")
+
+    return result
+
+
+def batch_translate_words_general(
+        words: Dict[str, WordInSentence],
+        step: StepConfig,
+) -> BatchWordTranslationResponse:
+    """Translate general meanings of multiple words in a single LLM call.
+
+    This is more efficient than calling translate_word_general for each word separately.
+
+    Args:
+        words: Dictionary mapping lemma -> WordInSentence info
+        step: Step configuration
+
+    Returns:
+        Batch response with general translations for all words
+    """
+    llm = build_llm(model=step.model, temperature=step.temperature)
+
+    prompts = build_batch_word_translation_prompts()
+
+    # Format words list with part of speech info
+    words_list = ""
+    for lemma, word_info in words.items():
+        words_list += f"- \"{lemma}\" ({word_info.part_of_speech})\n"
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", prompts["system"]),
+        ("human", prompts["human"]),
+    ])
+
+    chain = prompt | llm.with_structured_output(BatchWordTranslationResponse)
+    result = cast(BatchWordTranslationResponse, retry_invoke(
+        chain,
+        {
+            "words_list": words_list,
+        },
+        max_retries=step.max_retries,
+        backoff_initial_seconds=step.backoff_initial_seconds,
+        backoff_multiplier=step.backoff_multiplier,
+    ))
+
+    if result is None:
+        raise RuntimeError("LLM did not return batch general translations")
 
     return result
 
@@ -507,20 +572,44 @@ def build_vocabulary_pipeline(
             if word.lemma not in all_unique_lemmas:
                 all_unique_lemmas[word.lemma] = word
 
-    # Step 5: Translate general meanings (one word at a time - original working approach)
-    print(f"Translating {len(all_unique_lemmas)} unique lemmas (general meanings)...")
+    # Step 5: Batch translate general meanings (ALL lemmas in ONE LLM call)
+    print(f"Batch translating {len(all_unique_lemmas)} unique lemmas (general meanings)...")
     general_translations: Dict[str, WordTranslationResponse] = {}
 
-    for idx, (lemma, word) in enumerate(all_unique_lemmas.items(), 1):
-        try:
-            general_trans = translate_word_general(lemma, word.part_of_speech, translate_step)
-            general_translations[lemma] = general_trans
+    try:
+        batch_result = batch_translate_words_general(all_unique_lemmas, translate_step)
 
-            if idx % 10 == 0 or idx == len(all_unique_lemmas):
-                print(f"  Progress: {idx}/{len(all_unique_lemmas)} lemmas translated")
-        except Exception as e:
-            print(f"  Error translating '{lemma}': {e}")
-            continue
+        # Convert list of translations to dict: lemma -> WordTranslationResponse
+        for trans in batch_result.translations:
+            general_translations[trans.lemma] = WordTranslationResponse(
+                russian=trans.russian,
+                spanish=trans.spanish
+            )
+
+        print(f"  Success: Translated all {len(general_translations)} lemmas in 1 LLM call")
+
+        # Debug: Show sample translations
+        if general_translations:
+            sample_lemma = list(general_translations.keys())[0]
+            sample_trans = general_translations[sample_lemma]
+            print(f"  Sample: '{sample_lemma}' -> RU: {sample_trans.russian}, ES: {sample_trans.spanish}")
+        else:
+            print(f"  WARNING: Batch translation returned empty list!")
+
+    except Exception as e:
+        print(f"  Error in batch translation: {e}")
+        print(f"  Falling back to one-by-one translation...")
+        # Fallback: translate one by one if batch fails
+        for idx, (lemma, word) in enumerate(all_unique_lemmas.items(), 1):
+            try:
+                general_trans = translate_word_general(lemma, word.part_of_speech, translate_step)
+                general_translations[lemma] = general_trans
+
+                if idx % 10 == 0 or idx == len(all_unique_lemmas):
+                    print(f"    Progress: {idx}/{len(all_unique_lemmas)} lemmas translated")
+            except Exception as e:
+                print(f"    Error translating '{lemma}': {e}")
+                continue
 
     # Step 6: Build vocabulary cards from batch results
     print("Constructing vocabulary cards...")
@@ -585,8 +674,8 @@ def build_vocabulary_pipeline(
 
     print(f"Generated {len(cards)} vocabulary cards total")
     print(f"Context translations: {len(sentence_groups)} LLM calls (one per sentence)")
-    print(f"General translations: {len(general_translations)} LLM calls")
-    total_llm_calls = len(sentence_groups) + len(general_translations)
+    print(f"General translations: 1 LLM call (batch)")
+    total_llm_calls = len(sentence_groups) + 1  # +1 for batch general translation
     old_approach_calls = 2 * (len(lemma_map) + len(phrasal_verb_map))
     if old_approach_calls > 0:
         savings = 100 * (1 - total_llm_calls / old_approach_calls)
@@ -602,6 +691,8 @@ __all__ = [
     "SentenceWithWords",
     "ContextTranslationResponse",
     "WordTranslationResponse",
+    "SingleWordGeneralTranslation",
+    "BatchWordTranslationResponse",
     "BatchWordContextTranslation",
     "BatchSentenceTranslationResponse",
     # Helper functions
@@ -613,6 +704,7 @@ __all__ = [
     "generate_vocabulary_card",
     # Batch translation
     "batch_translate_sentence_words",
+    "batch_translate_words_general",
     # Pipeline functions
     "process_lemma_batch",
     "build_vocabulary_pipeline",
