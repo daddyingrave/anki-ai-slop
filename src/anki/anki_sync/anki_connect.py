@@ -140,6 +140,24 @@ class AnkiConnectClient:
     def add_notes(self, notes: Sequence[Mapping[str, Any]]) -> List[int | None]:
         return list(self.invoke("addNotes", {"notes": list(notes)}) or [])
 
+    def store_media_file(self, filename: str, data: bytes) -> None:
+        """Store media file in Anki's media collection.
+
+        Args:
+            filename: Name of the file (e.g., "hash.mp3")
+            data: Binary file content
+
+        Raises:
+            RuntimeError: If storing media fails
+        """
+        import base64
+
+        params = {
+            "filename": filename,
+            "data": base64.b64encode(data).decode("utf-8"),
+        }
+        self.invoke("storeMediaFile", params)
+
 
 class SyncResult:
     def __init__(self) -> None:

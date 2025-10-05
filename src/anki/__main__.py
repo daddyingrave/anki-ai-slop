@@ -10,8 +10,9 @@ from typing import Optional
 import yaml
 from pydantic import ValidationError
 
-from anki.anki_sync.anki_connect import anki_id, sync_anki_cards
+from anki.anki_sync.anki_connect import anki_id, sync_anki_cards, AnkiConnectClient
 from anki.common.observability import enable_cache
+from anki.common.tts import TTSClient
 from anki.config_models import RunConfig, ObsidianPipelineConfig, VocabularyPipelineConfig
 from anki.pipelines.obsidian.chains import build_obsidian_pipeline
 from anki.pipelines.vocabulary.chains import build_vocabulary_pipeline
@@ -103,6 +104,11 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
             else:
                 print(f"Warning: phrasal_verbs_file not found: {pv_file}")
 
+        # Setup clients
+        anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
+        tts_client = TTSClient(cache_dir=Path(pipeline_cfg.audio_output_dir))
+        anki_client = AnkiConnectClient(anki_url)
+
         # Run the vocabulary pipeline
         cards = build_vocabulary_pipeline(
             input_file=str(input_file),
@@ -111,10 +117,11 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
             phrasal_verbs_file=phrasal_verbs_path,
             translate_step=pipeline_cfg.translate,
             review_step=pipeline_cfg.review,
+            tts_client=tts_client,
+            anki_client=anki_client,
         )
 
         # Sync to Anki
-        anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
         note_type = "Vocabulary Improved"
 
         notes = [vocabulary_card_to_note(card) for card in cards]

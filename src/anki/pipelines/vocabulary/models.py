@@ -30,6 +30,10 @@ class VocabularyCard(BaseModel):
     english_context: str = Field(..., description="Context sentence with the word highlighted in <b> tags")
     part_of_speech: str = Field(..., description="Part of speech (e.g., 'noun', 'verb', 'phrasal verb')")
 
+    # Audio fields
+    english_audio: str = Field(default="", description="Filename for word audio (e.g., hash.mp3)")
+    english_context_audio: str = Field(default="", description="Filename for context audio (e.g., hash.mp3)")
+
     # Russian translations
     russian_word_translation: str = Field(..., description="Russian translation of the word in context")
     russian_context_translation: Optional[str] = Field(None, description="Russian translation of the entire sentence")
@@ -80,6 +84,6 @@ def vocabulary_card_to_note(card: VocabularyCard) -> VocabularyNote:
         RussianContextTranslation=card.russian_context_translation or "",
         RussianCommonTranslations=card.russian_common_translations,
         SpanishCommonTranslations=card.spanish_common_translations,
-        EnglishAudio="",  # Audio will be added later if needed
-        EnglishContextAudio="",
+        EnglishAudio=f"[sound:{card.english_audio}]" if card.english_audio else "",
+        EnglishContextAudio=f"[sound:{card.english_context_audio}]" if card.english_context_audio else "",
     )

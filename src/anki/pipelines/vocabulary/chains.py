@@ -4,13 +4,16 @@ LangChain chains for generating vocabulary cards from lemmatizer output.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Dict, List, cast
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from anki.anki_sync.anki_connect import AnkiConnectClient
 from anki.common.llm import build_llm
 from anki.common.reliability import retry_invoke
+from anki.common.tts import TTSClient
 from anki.config_models import StepConfig
 from anki.lemmatizer import (
     LemmaExtractor,
@@ -90,6 +93,8 @@ def highlight_word_in_context(word: str, context: str) -> str:
     highlighted = pattern.sub(lambda m: f"<b>{m.group()}</b>", context, count=1)
 
     return highlighted
+
+
 
 
 def translate_words_general(
@@ -350,6 +355,8 @@ def build_vocabulary_pipeline(
         phrasal_verbs_file: str | None,
         translate_step: StepConfig,
         review_step: StepConfig,
+        tts_client: TTSClient,
+        anki_client: AnkiConnectClient,
 ) -> List[VocabularyCard]:
     """Complete pipeline to process a text file and generate vocabulary cards.
 
@@ -357,7 +364,8 @@ def build_vocabulary_pipeline(
     1. Extracts lemmas using the lemmatizer
     2. Translates words in context and general meanings
     3. Reviews and fixes translations
-    4. Returns a list of VocabularyCard objects
+    4. Generates audio and uploads to Anki
+    5. Returns a list of VocabularyCard objects
 
     Args:
         input_file: Path to the input text file
@@ -366,6 +374,8 @@ def build_vocabulary_pipeline(
         phrasal_verbs_file: Optional path to phrasal verbs CSV file
         translate_step: Step configuration for translation
         review_step: Step configuration for review
+        tts_client: TTS client for audio generation
+        anki_client: AnkiConnect client for uploading audio
 
     Returns:
         List of VocabularyCard objects
@@ -445,21 +455,39 @@ def build_vocabulary_pipeline(
         for word_trans in ctx_result.words:
             context_lookup[(sentence_text, word_trans.lemma)] = word_trans
 
-    # Create one card per unique lemma (use first occurrence)
-    processed_lemmas = set()
+    processed_lemmas: set[str] = set()
+    processed_sentences: set[str] = set()
 
     for sentence in sentences:
         sentence_raw = sentence.sentence
-        # Get the cached sentence translation for this sentence
+        context_text = re.sub(r'<[^>]+>', '', sentence_raw)
+
+        # Generate and upload audio for sentence once
+        context_audio_filename = ""
+        if sentence_raw not in processed_sentences:
+            try:
+                audio_file = tts_client.generate_audio(context_text)
+                context_audio_filename = audio_file.filename
+                anki_client.store_media_file(audio_file.filename, audio_file.content)
+            except RuntimeError as e:
+                print(f"  Warning: {e}")
+            processed_sentences.add(sentence_raw)
 
         for word in sentence.words:
-            # Only create card for first occurrence of each lemma
             if word.lemma in processed_lemmas:
                 continue
 
             processed_lemmas.add(word.lemma)
 
-            # Get context translation from batch result
+            # Generate and upload audio for word once
+            word_audio_filename = ""
+            try:
+                audio_file = tts_client.generate_audio(word.original_word)
+                word_audio_filename = audio_file.filename
+                anki_client.store_media_file(audio_file.filename, audio_file.content)
+            except RuntimeError as e:
+                print(f"  Warning: {e}")
+
             context_trans = context_lookup.get((sentence_raw, word.lemma))
             if not context_trans:
                 print(f"  Warning: No context translation for '{word.lemma}'")
@@ -479,6 +507,8 @@ def build_vocabulary_pipeline(
                 english_original_word=word.original_word,
                 english_context=highlight_word_in_context(word.original_word, sentence_raw),
                 part_of_speech=word.part_of_speech,
+                english_audio=word_audio_filename,
+                english_context_audio=context_audio_filename,
                 russian_word_translation=context_trans.russian_word,
                 russian_context_translation=highlight_word_in_context(context_trans.russian_word,
                                                                       context_trans.russian_sentence),

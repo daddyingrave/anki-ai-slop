@@ -48,7 +48,7 @@ class VocabularyPipelineConfig(BaseModel):
     model_type: str = Field(default="ACCURATE", description="spaCy model type (EFFICIENT, ACCURATE, TRANSFORMER)")
     deck_name: str = Field(default="Vocabulary", description="Anki deck name")
     phrasal_verbs_file: Path | None = Field(default=None, description="Optional path to phrasal verbs CSV file")
-
+    audio_output_dir: str
     # Translation step configuration
     translate: StepConfig
     review: StepConfig

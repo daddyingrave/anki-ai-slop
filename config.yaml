@@ -24,6 +24,7 @@ pipelines:
     model_type: TRANSFORMER
     deck_name: Vocabulary::AI and ML
     phrasal_verbs_file: data/phrasal_verbs.csv
+    audio_output_dir: out/vasian
 
     translate:
       model: models/gemini-2.0-flash-lite
