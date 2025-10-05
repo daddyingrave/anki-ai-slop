@@ -26,6 +26,13 @@ pipelines:
     phrasal_verbs_file: data/phrasal_verbs.csv
     audio_output_dir: out/vasian
 
+    tts:
+      model_name: ""
+      voice_name: en-US-Studio-Q
+      language_code: en-US
+      speaking_rate: 1.0
+      pitch: 0.0
+
     translate:
       model: models/gemini-2.0-flash-lite
       temperature: 0.0

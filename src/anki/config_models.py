@@ -31,6 +31,15 @@ class ObsidianPipelineConfig(BaseModel):
     review: StepConfig
 
 
+class TTSConfig(BaseModel):
+    """TTS voice configuration for Gemini Flash TTS."""
+    model_name: str = Field(default="gemini-2.5-flash-tts", description="Gemini TTS model name")
+    voice_name: str = Field(default="Enceladus", description="Prebuilt voice name (e.g. Enceladus, Puck, Charon, Kore)")
+    language_code: str = Field(default="en-us", description="Language code")
+    speaking_rate: float = Field(default=1.0, ge=0.25, le=4.0, description="Speaking rate (0.25-4.0)")
+    pitch: float = Field(default=0.0, ge=-20.0, le=20.0, description="Voice pitch (-20.0 to 20.0)")
+
+
 class VocabularyPipelineConfig(BaseModel):
     """Configuration for the Vocabulary pipeline (formerly Lemmatizer → Anki).
 
@@ -49,6 +58,7 @@ class VocabularyPipelineConfig(BaseModel):
     deck_name: str = Field(default="Vocabulary", description="Anki deck name")
     phrasal_verbs_file: Path | None = Field(default=None, description="Optional path to phrasal verbs CSV file")
     audio_output_dir: str
+    tts: TTSConfig = Field(default_factory=TTSConfig, description="TTS voice configuration")
     # Translation step configuration
     translate: StepConfig
     review: StepConfig

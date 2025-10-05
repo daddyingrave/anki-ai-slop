@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from anki.anki_sync.anki_connect import anki_id, sync_anki_cards, AnkiConnectClient
 from anki.common.observability import enable_cache
-from anki.common.tts import TTSClient
+from anki.common.tts import TTSClient, TTSVoiceConfig
 from anki.config_models import RunConfig, ObsidianPipelineConfig, VocabularyPipelineConfig
 from anki.pipelines.obsidian.chains import build_obsidian_pipeline
 from anki.pipelines.vocabulary.chains import build_vocabulary_pipeline
@@ -106,7 +106,14 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
 
         # Setup clients
         anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
-        tts_client = TTSClient(cache_dir=Path(pipeline_cfg.audio_output_dir))
+        voice_config = TTSVoiceConfig(
+            model_name=pipeline_cfg.tts.model_name,
+            voice_name=pipeline_cfg.tts.voice_name,
+            language_code=pipeline_cfg.tts.language_code,
+            speaking_rate=pipeline_cfg.tts.speaking_rate,
+            pitch=pipeline_cfg.tts.pitch,
+        )
+        tts_client = TTSClient(cache_dir=Path(pipeline_cfg.audio_output_dir), voice_config=voice_config)
         anki_client = AnkiConnectClient(anki_url)
 
         # Run the vocabulary pipeline
