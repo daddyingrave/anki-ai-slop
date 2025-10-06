@@ -132,12 +132,12 @@ def build_obsidian_pipeline(
 
         initial_deck = generate_anki_deck(
             article,
-            step=pipeline.generate,
+            step=pipeline_cfg.generate,
         )
         reviewed_deck = review_anki_deck(
             article,
             initial_deck,
-            step=pipeline.review,
+            step=pipeline_cfg.review,
         )
 
         deck: AnkiDeck = reviewed_deck

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import time
 
@@ -36,5 +37,38 @@ def retry_invoke(chain, inputs: dict, *, max_retries: int, backoff_initial_secon
             if attempt >= max_retries:
                 raise
             time.sleep(delay)
+            delay *= backoff_multiplier
+            attempt += 1
+
+
+async def async_retry_invoke(chain, inputs: dict, *, max_retries: int, backoff_initial_seconds: float, backoff_multiplier: float):
+    """Async invoke a chain with retries and exponential backoff.
+
+    max_retries is the number of retries after the initial attempt.
+    """
+    attempt = 0
+    delay = backoff_initial_seconds
+    callbacks = get_default_callbacks()
+
+    # Feature-detect whether chain.ainvoke supports a 'config' kwarg
+    try:
+        sig = inspect.signature(chain.ainvoke)
+        supports_config = (
+                'config' in sig.parameters or any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values())
+        )
+    except Exception:
+        supports_config = False
+
+    while True:
+        try:
+            if supports_config:
+                # LangChain 0.2+ Runnable.ainvoke accepts config with callbacks
+                return await chain.ainvoke(inputs, config={"callbacks": callbacks})
+            # Fallback for older versions
+            return await chain.ainvoke(inputs)
+        except Exception:
+            if attempt >= max_retries:
+                raise
+            await asyncio.sleep(delay)
             delay *= backoff_multiplier
             attempt += 1

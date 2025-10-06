@@ -18,3 +18,24 @@ pipelines:
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
+
+  vocabulary:
+    input_file: .testdata/chapter 2.txt
+    language: EN
+    model_type: TRANSFORMER
+    deck_name: Vocabulary::Books::Wheel Of Time::The Eye of the World
+    phrasal_verbs_file: data/phrasal_verbs.csv
+    audio_output_dir: out/audio
+
+    translate:
+      model: models/gemini-2.5-flash
+      temperature: 0.4
+      max_retries: 3
+      backoff_initial_seconds: 0.5
+      backoff_multiplier: 2.0
+    review:
+      model: models/gemini-2.5-pro
+      temperature: 0.0
+      max_retries: 2
+      backoff_initial_seconds: 0.5
+      backoff_multiplier: 2.0
