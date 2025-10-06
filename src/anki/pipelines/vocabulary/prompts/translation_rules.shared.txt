@@ -47,7 +47,6 @@ General translation specific rules:
 - Focus on the most common, general meanings (not context-specific)
 - Provide up to 2 most frequent translations per language
 - Translations should work across multiple contexts
-- Proper nouns should return empty lists
 - Each language's translations are independent
 
 Lemma verification rules:

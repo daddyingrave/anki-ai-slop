@@ -6,6 +6,7 @@ Goals:
 - Verify translations are appropriate for the part of speech
 - Remove any context-specific translations (use general meanings only)
 - Ensure translations are commonly used and educationally valuable
+- Every word in the list needs to be analyzed independently of its context or relationships with other words.
 
 Unified rules (apply fully):
 {{TRANSLATION_RULES}}

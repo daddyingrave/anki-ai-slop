@@ -463,15 +463,15 @@ def build_vocabulary_pipeline(
         context_text = re.sub(r'<[^>]+>', '', sentence_raw)
 
         # Generate and upload audio for sentence once
-        context_audio_filename = ""
-        if sentence_raw not in processed_sentences:
-            try:
-                audio_file = tts_client.generate_audio(context_text)
-                context_audio_filename = audio_file.filename
-                anki_client.store_media_file(audio_file.filename, audio_file.content)
-            except RuntimeError as e:
-                print(f"  Warning: {e}")
-            processed_sentences.add(sentence_raw)
+        # context_audio_filename = ""
+        # if sentence_raw not in processed_sentences:
+        #     try:
+        #         audio_file = tts_client.generate_audio(context_text)
+        #         context_audio_filename = audio_file.filename
+        #         anki_client.store_media_file(audio_file.filename, audio_file.content)
+        #     except RuntimeError as e:
+        #         print(f"  Warning: {e}")
+        #     processed_sentences.add(sentence_raw)
 
         for word in sentence.words:
             if word.lemma in processed_lemmas:
@@ -480,13 +480,13 @@ def build_vocabulary_pipeline(
             processed_lemmas.add(word.lemma)
 
             # Generate and upload audio for word once
-            word_audio_filename = ""
-            try:
-                audio_file = tts_client.generate_audio(word.original_word)
-                word_audio_filename = audio_file.filename
-                anki_client.store_media_file(audio_file.filename, audio_file.content)
-            except RuntimeError as e:
-                print(f"  Warning: {e}")
+            # word_audio_filename = ""
+            # try:
+            #     audio_file = tts_client.generate_audio(word.original_word)
+            #     word_audio_filename = audio_file.filename
+            #     anki_client.store_media_file(audio_file.filename, audio_file.content)
+            # except RuntimeError as e:
+            #     print(f"  Warning: {e}")
 
             context_trans = context_lookup.get((sentence_raw, word.lemma))
             if not context_trans:
@@ -507,8 +507,8 @@ def build_vocabulary_pipeline(
                 english_original_word=word.original_word,
                 english_context=highlight_word_in_context(word.original_word, sentence_raw),
                 part_of_speech=word.part_of_speech,
-                english_audio=word_audio_filename,
-                english_context_audio=context_audio_filename,
+                # english_audio=word_audio_filename,
+                # english_context_audio=context_audio_filename,
                 russian_word_translation=context_trans.russian_word,
                 russian_context_translation=highlight_word_in_context(context_trans.russian_word,
                                                                       context_trans.russian_sentence),

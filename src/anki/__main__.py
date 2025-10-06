@@ -129,7 +129,7 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
         )
 
         # Sync to Anki
-        note_type = "Vocabulary Improved"
+        note_type = "vocabulary-improved"
 
         notes = [vocabulary_card_to_note(card) for card in cards]
 

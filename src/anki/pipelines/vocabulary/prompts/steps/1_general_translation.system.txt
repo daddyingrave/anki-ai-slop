@@ -38,7 +38,7 @@ Expected general translations:
 "lead" → Russian: ["вести", "возглавлять"], Spanish: ["liderar", "dirigir"]
 "follow" → Russian: ["следовать", "идти за"], Spanish: ["seguir", "acompañar"]
 "path" → Russian: ["путь", "дорожка"], Spanish: ["camino", "sendero"]
-"shy away" → Russian: ["улоняться"], Spanish: ["evitar"]
+"shy away" → Russian: ["улоняться", "избегать"], Spanish: ["evitar", "rehuir"]
 
 Example 2 - Including a proper noun:
 Input words:

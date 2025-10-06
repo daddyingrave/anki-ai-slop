@@ -1,0 +1,14 @@
+ID
+PartOfSpeech
+EnglishLemma
+EnglishOriginalWord
+EnglishContext
+RussianLemmaUsageTranslation
+SpanishLemmaUsageTranslation
+RussianContextTranslation
+RussianCommonTranslations
+SpanishCommonTranslations
+SpanishAudio
+EnglishAudio
+EnglishContextAudio
+Image

@@ -170,7 +170,7 @@ class SyncResult:
 
 
 def ensure_vocabulary_improved_model(client: AnkiConnectClient) -> None:
-    """Ensure the Vocabulary Improved note type exists in Anki.
+    """Ensure the vocabulary-improved note type exists in Anki.
 
     Args:
         client: AnkiConnect client instance
@@ -180,7 +180,7 @@ def ensure_vocabulary_improved_model(client: AnkiConnectClient) -> None:
     """
     # Check if model already exists
     existing_models = client.model_names()
-    if "Vocabulary Improved" in existing_models:
+    if "vocabulary-improved" in existing_models:
         return  # Model already exists
 
     # Create the model
@@ -222,12 +222,12 @@ def sync_anki_cards(
         result.failures.append(f"AnkiConnect unreachable at {anki_connect_url}")
         return result
 
-    # Ensure Vocabulary Improved model exists if using that note type
-    if note_type == "Vocabulary Improved":
+    # Ensure vocabulary-improved model exists if using that note type
+    if note_type == "vocabulary-improved":
         try:
             ensure_vocabulary_improved_model(client)
         except RuntimeError as e:
-            print(f"[anki-sync] WARNING: Failed to create Vocabulary Improved model: {e}", file=sys.stderr)
+            print(f"[anki-sync] WARNING: Failed to create vocabulary-improved model: {e}", file=sys.stderr)
 
     # Ensure deck exists (create if not)
     try:
