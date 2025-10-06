@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 
@@ -68,9 +68,14 @@ class RunConfig(BaseModel):
     """Top-level run configuration (new schema only).
 
     - pipelines: contains static keys for each pipeline type
+
+    Note: Pipeline values are stored as Any to avoid Pydantic union validation issues.
+    Cast to specific config types (ObsidianPipelineConfig, VocabularyPipelineConfig, MistralOcrConfig)
+    after retrieval using .get()
     """
 
     # Structured pipelines (required to run)
-    pipelines: Dict[str, ObsidianPipelineConfig | VocabularyPipelineConfig ] | None = Field(
+    # Using Any instead of Union to avoid Pydantic trying to validate all union members for each value
+    pipelines: Dict[str, Any] | None = Field(
         default=None, description="Pipelines configuration keyed by pipeline id"
     )

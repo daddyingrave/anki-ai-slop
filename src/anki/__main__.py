@@ -58,9 +58,12 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
         raise SystemExit("Missing pipelines configuration")
 
     if pipeline_name == "obsidian_to_anki":
-        pipeline_cfg: ObsidianPipelineConfig | None = cfg.pipelines.get("obsidian_to_anki")
-        if pipeline_cfg is None:
+        pipeline_cfg_raw = cfg.pipelines.get("obsidian_to_anki")
+        if pipeline_cfg_raw is None:
             raise SystemExit("Missing pipelines.obsidian_to_anki configuration after normalization")
+
+        # Parse raw dict to typed config
+        pipeline_cfg = ObsidianPipelineConfig(**pipeline_cfg_raw)
 
         # Run the obsidian pipeline
         deck_results = build_obsidian_pipeline(
@@ -87,9 +90,12 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
                 encoding="utf-8")
 
     elif pipeline_name == "vocabulary":
-        pipeline_cfg: VocabularyPipelineConfig | None = cfg.pipelines.get("vocabulary")
-        if pipeline_cfg is None:
+        pipeline_cfg_raw = cfg.pipelines.get("vocabulary")
+        if pipeline_cfg_raw is None:
             raise SystemExit("Missing pipelines.vocabulary configuration after normalization")
+
+        # Parse raw dict to typed config
+        pipeline_cfg = VocabularyPipelineConfig(**pipeline_cfg_raw)
 
         input_file = Path(pipeline_cfg.input_file)
         if not input_file.exists() or not input_file.is_file():
