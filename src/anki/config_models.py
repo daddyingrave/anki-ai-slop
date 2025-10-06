@@ -71,6 +71,6 @@ class RunConfig(BaseModel):
     """
 
     # Structured pipelines (required to run)
-    pipelines: Dict[str, ObsidianPipelineConfig | VocabularyPipelineConfig] | None = Field(
+    pipelines: Dict[str, ObsidianPipelineConfig | VocabularyPipelineConfig ] | None = Field(
         default=None, description="Pipelines configuration keyed by pipeline id"
     )

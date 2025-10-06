@@ -4,7 +4,7 @@ pipelines:
   obsidian_to_anki:
     # Discovery
     vault_dir: /Users/daddyingrave/Code/Personal/eat-ai-shit
-    notes_path: out/Computing Systems Elements 2nd Ed-part-3.md
+    notes_path: out/1 Boolean Logic.md
 
     generate:
       model: models/gemini-2.5-flash
@@ -39,3 +39,11 @@ pipelines:
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
+
+  mistral_ocr:
+    input_file_path: .testdata/Computing Systems Elements 2nd Ed-part-3.pdf
+    output_dir: ./out
+    output_format: markdown
+    override_existing: true
+    page_start: null  # Start page (0-indexed). null = from first page. Example: 0 for first page
+    page_end: null    # End page (0-indexed, inclusive). null = to last page. Example: 9 for 10th page

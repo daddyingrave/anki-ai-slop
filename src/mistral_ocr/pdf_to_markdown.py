@@ -116,7 +116,7 @@ def _save_image(
 
 
 def _process_pdf_with_mistral_ocr(
-    client: Mistral, pdf_b64: str, media_dir: Path
+    client: Mistral, pdf_b64: str, media_dir: Path, page_start: Optional[int] = None, page_end: Optional[int] = None
 ) -> str:
     """Process PDF with Mistral OCR API and save extracted images.
 
@@ -124,6 +124,8 @@ def _process_pdf_with_mistral_ocr(
         client: Initialized Mistral API client.
         pdf_b64: Base64 encoded PDF content.
         media_dir: Directory to save extracted images.
+        page_start: Optional start page (0-indexed, inclusive). If None, starts from first page.
+        page_end: Optional end page (0-indexed, inclusive). If None, processes to last page.
 
     Returns:
         Markdown formatted text with page separators and corrected image paths.
@@ -132,14 +134,29 @@ def _process_pdf_with_mistral_ocr(
         PdfConversionError: If OCR processing fails.
     """
     try:
-        ocr_response = client.ocr.process(
-            model="mistral-ocr-latest",
-            document={
+        # Build OCR request parameters
+        ocr_params = {
+            "model": "mistral-ocr-latest",
+            "document": {
                 "type": "document_url",
                 "document_url": f"data:application/pdf;base64,{pdf_b64}",
             },
-            include_image_base64=True,
-        )
+            "include_image_base64": True,
+        }
+
+        # Add pages parameter if a range is specified
+        if page_start is not None or page_end is not None:
+            # Build page range list
+            start = page_start if page_start is not None else 0
+            # If end is not specified, we'll process a large range (Mistral will handle the actual max)
+            end = page_end if page_end is not None else 999999
+
+            # Create list of page numbers in the range
+            pages = list(range(start, end + 1))
+            ocr_params["pages"] = pages
+            logger.info(f"Processing pages {start} to {end} (0-indexed)")
+
+        ocr_response = client.ocr.process(**ocr_params)
 
         # Extract markdown content from pages and save images
         markdown_parts: list[str] = []
@@ -195,6 +212,8 @@ def convert_pdf(
     output_dir: str | Path,
     output_format: Literal["markdown"] = "markdown",
     override_existing: bool = True,
+    page_start: Optional[int] = None,
+    page_end: Optional[int] = None,
 ) -> Path:
     """Convert a PDF to Markdown using Mistral OCR API.
 
@@ -209,6 +228,8 @@ def convert_pdf(
         output_format: Output format. Currently only "markdown" is supported.
         override_existing: If False and output file exists, raises an error instead
             of overwriting.
+        page_start: Optional start page (0-indexed, inclusive). If None, starts from first page.
+        page_end: Optional end page (0-indexed, inclusive). If None, processes to last page.
 
     Returns:
         Path to the produced markdown file.
@@ -227,6 +248,19 @@ def convert_pdf(
         ...     output_dir="./output"
         ... )
         >>> print(f"Converted to: {output}")
+        >>> # Process pages 0-9 (first 10 pages)
+        >>> output = convert_pdf(
+        ...     input_file_path="document.pdf",
+        ...     output_dir="./output",
+        ...     page_start=0,
+        ...     page_end=9
+        ... )
+        >>> # Process from page 5 to end
+        >>> output = convert_pdf(
+        ...     input_file_path="document.pdf",
+        ...     output_dir="./output",
+        ...     page_start=5
+        ... )
     """
     # Validate and resolve paths
     in_path = Path(input_file_path).expanduser().resolve()
@@ -275,7 +309,7 @@ def convert_pdf(
 
     # Process PDF with Mistral OCR API
     try:
-        md_text = _process_pdf_with_mistral_ocr(client, pdf_b64, media_dir)
+        md_text = _process_pdf_with_mistral_ocr(client, pdf_b64, media_dir, page_start, page_end)
     except Exception as e:
         raise PdfConversionError(f"Failed to process PDF with Mistral OCR: {e}") from e
 

@@ -45,3 +45,11 @@ pipelines:
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
+
+  mistral_ocr:
+    input_file_path: .testdata/Computing Systems Elements 2nd Ed.pdf
+    output_dir: ./out
+    output_format: markdown
+    override_existing: true
+    page_start: 76
+    page_end: 94
