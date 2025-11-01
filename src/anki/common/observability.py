@@ -207,6 +207,13 @@ class GeminiTokenUsageCallback(BaseCallbackHandler):
 
     def on_llm_end(self, response: LLMResult, *, run_id, parent_run_id=None, **kwargs) -> None:  # type: ignore[override]
         try:
+            # Check if this is a LangChain cache hit
+            # When SQLiteCache returns a cached result, llm_output is None or empty
+            # If cache hit, don't accumulate tokens (no actual LLM call was made)
+            if not response.llm_output or len(response.llm_output) == 0:
+                logger.debug("LangChain cache hit - skipping token accumulation")
+                return
+
             usage = self._extract_usage_metadata(response)
             if not usage:
                 return
