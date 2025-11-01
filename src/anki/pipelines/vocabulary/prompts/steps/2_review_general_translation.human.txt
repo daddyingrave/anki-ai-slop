@@ -12,6 +12,3 @@ Task:
 - Remove any rare or uncommon translations
 - Ensure up to 2 most frequent translations per language
 - Verify proper nouns have empty translation lists
-
-Unified rules to enforce:
-{{TRANSLATION_RULES}}

@@ -27,6 +27,3 @@ Task:
 Examples of bidirectional fixes:
 - If sentence "он повернул голову" should be "он отвернул голову", update "turn" word to "отвернул"
 - If word "тебя" doesn't match sentence "за тобой", change word to "тобой"
-
-Unified rules to enforce:
-{{TRANSLATION_RULES}}

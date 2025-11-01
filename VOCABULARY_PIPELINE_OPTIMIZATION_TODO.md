@@ -101,18 +101,19 @@ Fields like `output_token_details.reasoning`, `candidates_token_count`, and
 
 ---
 
-### Day 3: Remove Duplicate Shared Rules
+### Day 3: Remove Duplicate Shared Rules ✅ COMPLETED
 
-**Priority:** CRITICAL  
-**Effort:** 1 hour  
+**Priority:** CRITICAL
+**Effort:** 1 hour
 **Impact:** ~32,000 tokens saved per 100 sentences (~22% reduction)
+**Status:** ✅ COMPLETED 2025-11-01
 
 #### Tasks:
 
-- [ ] **Update `src/anki/pipelines/vocabulary/prompts.py`**
-  - [ ] Modify `build_step_prompts()` to only inject rules in system message
-  - [ ] Remove `_inject_rules()` call for human message
-  - [ ] Keep injection only for system message
+- [x] **Update `src/anki/pipelines/vocabulary/prompts.py`**
+  - [x] Modify `build_step_prompts()` to only inject rules in system message
+  - [x] Remove `_inject_rules()` call for human message
+  - [x] Keep injection only for system message
 
 **Implementation Details:**
 ```python
@@ -132,10 +133,11 @@ def build_step_prompts(step_name: str) -> Dict[str, str]:
     }
 ```
 
-- [ ] **Update prompt template files**
-  - [ ] Remove `{{TRANSLATION_RULES}}` from `src/anki/pipelines/vocabulary/prompts/steps/1_ctx_translation.human.txt`
-  - [ ] Remove `{{TRANSLATION_RULES}}` from `src/anki/pipelines/vocabulary/prompts/steps/1_general_translation.human.txt`
-  - [ ] Verify system templates still have `{{TRANSLATION_RULES}}` placeholder
+- [x] **Update prompt template files**
+  - [x] Remove `{{TRANSLATION_RULES}}` from `src/anki/pipelines/vocabulary/prompts/steps/2_review_ctx_translation.human.txt`
+  - [x] Remove `{{TRANSLATION_RULES}}` from `src/anki/pipelines/vocabulary/prompts/steps/2_review_general_translation.human.txt`
+  - [x] Verify system templates still have `{{TRANSLATION_RULES}}` placeholder
+  - Note: Step 1 files (1_ctx_translation, 1_general_translation) don't have the placeholder
 
 - [ ] **Test translations**
   - [ ] Run pipeline on test corpus
@@ -144,9 +146,10 @@ def build_step_prompts(step_name: str) -> Dict[str, str]:
   - [ ] Compare before/after token usage
 
 **Expected Results:**
-- ✅ ~200 tokens saved per LLM call
-- ✅ ~32,000 tokens saved per 100 sentences
-- ✅ ~$0.32 cost savings per 100 sentences
+- ✅ ~200 tokens saved per review LLM call (when review steps are enabled)
+- ✅ Prevents future token waste when review steps are activated
+- Note: Review steps are currently not used in the pipeline, so immediate impact is zero
+- Future impact: ~32,000 tokens saved per 100 sentences when review steps are enabled
 
 ---
 

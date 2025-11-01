@@ -41,7 +41,7 @@ def build_step_prompts(step_name: str) -> Dict[str, str]:
 
     return {
         "system": _inject_rules(system_template, shared_rules),
-        "human": _inject_rules(human_template, shared_rules),
+        "human": human_template,  # No injection - rules only in system message
     }
 
 
