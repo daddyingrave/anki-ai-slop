@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,12 +12,15 @@ import yaml
 from pydantic import ValidationError
 
 from anki.anki_sync.anki_connect import anki_id, sync_anki_cards, AnkiConnectClient
+from anki.common.logging_config import setup_logging
 from anki.common.observability import enable_cache
 from anki.common.tts import TTSClient, TTSVoiceConfig
 from anki.config_models import RunConfig, ObsidianPipelineConfig, VocabularyPipelineConfig
 from anki.pipelines.obsidian.chains import build_obsidian_pipeline
 from anki.pipelines.vocabulary.chains import build_vocabulary_pipeline
 from anki.pipelines.vocabulary.models import vocabulary_card_to_note
+
+logger = logging.getLogger(__name__)
 
 
 def _require_google_key() -> None:
@@ -34,11 +38,20 @@ class BasicNote:
     Back: str = ""
 
 
-def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> None:
+def run_from_config(pipeline_name: str, config_path: Optional[Path] = None, log_level: str = "INFO") -> None:
     """Run a selected pipeline based on a YAML configuration file and then sync to Anki.
 
     If config_path is None, defaults to ./config.yaml in the current working directory.
+
+    Args:
+        pipeline_name: Name of the pipeline to run
+        config_path: Path to the configuration file
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
+    # Initialize logging first
+    setup_logging(log_level)
+    logger.info(f"Starting pipeline: {pipeline_name}", extra={"pipeline": pipeline_name, "log_level": log_level})
+
     # Initialize caching and tracing before any LLM usage
     enable_cache(Path.cwd() / "cache.db")
     _require_google_key()
@@ -108,7 +121,7 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None) -> N
             if pv_file.exists() and pv_file.is_file():
                 phrasal_verbs_path = str(pv_file)
             else:
-                print(f"Warning: phrasal_verbs_file not found: {pv_file}")
+                logger.warning(f"phrasal_verbs_file not found: {pv_file}", extra={"file": str(pv_file)})
 
         # Setup clients
         anki_url = os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765")
@@ -176,7 +189,18 @@ if __name__ == "__main__":
         default="config.yaml",
         help="Path to YAML config (defaults to ./config.yaml)",
     )
+    parser.add_argument(
+        "--log-level",
+        required=False,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level (default: INFO). Use DEBUG to see LLM prompts/responses.",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config)
-    run_from_config(pipeline_name=args.pipeline_name, config_path=config_path)
+    run_from_config(
+        pipeline_name=args.pipeline_name,
+        config_path=config_path,
+        log_level=args.log_level
+    )

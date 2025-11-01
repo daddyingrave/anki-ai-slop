@@ -5,6 +5,7 @@ This module provides a class for extracting lemmas and phrasal verbs from text f
 It supports different source languages and model types.
 """
 
+import logging
 import os.path
 from collections import defaultdict
 from enum import Enum, auto
@@ -21,6 +22,8 @@ from .phrasal_verb_processor import (
     VerbParticlePair
 )
 from .text_processor import exit_with_error, process_text_file
+
+logger = logging.getLogger(__name__)
 
 
 class LanguageMnemonic(str, Enum):
@@ -129,9 +132,9 @@ class LemmaExtractor:
         # Load spaCy model
         model_name = self._LANGUAGE_TO_MODEL[lang][mod_type]
 
-        print(f"Loading spaCy model: {model_name}")
+        logger.info("Loading spaCy model", extra={"model": model_name})
         self.nlp = spacy.load(model_name)
-        print(f"Model loaded successfully")
+        logger.info("Model loaded successfully")
 
     @staticmethod
     def get_human_readable_pos(pos_tag: str) -> str:
@@ -160,7 +163,10 @@ class LemmaExtractor:
         """
         # Check if the language supports phrasal verbs
         if self.language not in self._LANGUAGES_WITH_PHRASAL_VERBS:
-            print(f"Warning: Language '{self.language}' does not have phrasal verbs as a concept. Skipping.")
+            logger.warning(
+                f"Language '{self.language}' does not have phrasal verbs as a concept. Skipping.",
+                extra={"language": self.language}
+            )
             return {}
 
         phrasal_verb_to_sentences: Dict[str, List[PhrasalVerbEntry]] = defaultdict(list)
@@ -168,7 +174,7 @@ class LemmaExtractor:
         # Create a matcher for phrasal verbs if a phrasal verbs file is provided
         if not phrasal_verbs_path or not os.path.isfile(phrasal_verbs_path):
             if phrasal_verbs_path:
-                print(f"Warning: Phrasal verbs file '{phrasal_verbs_path}' not found.")
+                logger.warning(f"Phrasal verbs file '{phrasal_verbs_path}' not found.", extra={"file": phrasal_verbs_path})
             return {}
 
         # Load and process phrasal verbs
@@ -280,7 +286,7 @@ class LemmaExtractor:
         # Read and normalize the text file
         file_content: str = process_text_file(file_path)
 
-        print("Processing text with spaCy...")
+        logger.info("Processing text with spaCy...")
         doc = self.nlp(file_content)
 
         # Build mapping: sentence -> list of words (directly as Pydantic models)

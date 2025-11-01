@@ -4,6 +4,7 @@ LangChain chains for generating vocabulary cards from lemmatizer output.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Dict, List, cast
 
@@ -27,6 +28,8 @@ from anki.pipelines.vocabulary.prompts import (
     build_ctx_translation_prompts,
     build_general_translation_prompts,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ContextTranslationResponse(BaseModel):
@@ -294,12 +297,19 @@ async def process_sentence_async(
         ctx_result = await translate_words_ctx(sentence_group, translate_step)
         general_result = None
 
-    # Print context translation for this sentence
-    print(f"\n  [{idx}/{total}] Sentence: {sentence_group.sentence[:80]}...")
+    # Log context translation for this sentence
+    logger.info(
+        "Translated sentence",
+        extra={
+            "sentence_num": idx,
+            "total_sentences": total,
+            "sentence_preview": sentence_group.sentence[:80] + "..."
+        }
+    )
     for word_trans in ctx_result.words:
-        print(f"    • {word_trans.lemma}: RU={word_trans.russian_word}, ES={word_trans.spanish_word}")
+        logger.debug(f"  • {word_trans.lemma}: RU={word_trans.russian_word}, ES={word_trans.spanish_word}")
     if ctx_result.words and ctx_result.words[0].russian_sentence:
-        print(f"    Sentence RU: {ctx_result.words[0].russian_sentence[:80]}...")
+        logger.debug(f"  Sentence RU: {ctx_result.words[0].russian_sentence[:80]}...")
 
     # Build new general translations dict
     new_general_translations: Dict[str, WordTranslationResponse] = {}
@@ -346,8 +356,10 @@ def build_vocabulary_pipeline(
         List of VocabularyCard objects
     """
     # Step 1: Extract lemmas using the lemmatizer
-    print(f"Processing file with lemmatizer: {input_file}")
-    print(f"Language: {language}, Model: {model_type}")
+    logger.info(
+        f"Processing file with lemmatizer: {input_file}",
+        extra={"language": language, "model_type": model_type}
+    )
 
     try:
         lang_enum = LanguageMnemonic(language)
@@ -367,11 +379,11 @@ def build_vocabulary_pipeline(
     extractor = LemmaExtractor(lang_enum, model_enum)
 
     # Step 2: Extract and group words by sentence
-    print("Extracting lemmas and grouping by sentence...")
+    logger.info("Extracting lemmas and grouping by sentence...")
     sentences = extractor.process_file(input_file, phrasal_verbs_file)
 
     # Step 3: Translate and review words by sentence (context + general meanings)
-    print("Translating and reviewing words in context and general meanings...")
+    logger.info("Translating and reviewing words in context and general meanings...")
     ctx_translations: Dict[str, CtxTranslationResponse] = {}
     general_translations: Dict[str, WordTranslationResponse] = {}
 
@@ -382,7 +394,16 @@ def build_vocabulary_pipeline(
             batch_end = min(batch_start + batch_size, len(sentences))
             batch = sentences[batch_start:batch_end]
 
-            print(f"\nProcessing batch {batch_start // batch_size + 1} (sentences {batch_start + 1}-{batch_end})...")
+            batch_num = batch_start // batch_size + 1
+            logger.info(
+                "Processing batch",
+                extra={
+                    "batch_num": batch_num,
+                    "batch_start": batch_start + 1,
+                    "batch_end": batch_end,
+                    "batch_size": len(batch),
+                }
+            )
 
             # Create tasks for this batch
             tasks = []
@@ -406,7 +427,11 @@ def build_vocabulary_pipeline(
             # Process results
             for (sentence_group, _), result in zip(tasks, results):
                 if isinstance(result, Exception):
-                    print(f"  Error translating/reviewing sentence: {result}")
+                    logger.error(
+                        f"Error translating sentence: {sentence_group.sentence[:50]}...",
+                        extra={"error": str(result)},
+                        exc_info=result
+                    )
                     continue
 
                 huy, new_general_translations = result
@@ -415,13 +440,16 @@ def build_vocabulary_pipeline(
                 # Update general translations dictionary
                 general_translations.update(new_general_translations)
 
-            print(f"\n  Progress: {batch_end}/{len(sentences)} sentences completed")
+            logger.info(
+                "Progress",
+                extra={"completed": batch_end, "total": len(sentences)}
+            )
 
     # Run the async processing
     asyncio.run(process_batch())
 
     # Step 4: Build vocabulary cards from translation results
-    print("Constructing vocabulary cards...")
+    logger.info("Constructing vocabulary cards...")
     cards: List[VocabularyCard] = []
 
     # Build lookup: (sentence, lemma) -> context translation
@@ -466,7 +494,7 @@ def build_vocabulary_pipeline(
 
             context_trans = context_lookup.get((sentence_raw, word.lemma))
             if not context_trans:
-                print(f"  Warning: No context translation for '{word.lemma}'")
+                logger.warning(f"No context translation for '{word.lemma}'", extra={"lemma": word.lemma})
                 continue
 
             # Get general translation
@@ -479,7 +507,10 @@ def build_vocabulary_pipeline(
 
             # Ensure russian_sentence is not None
             if not context_trans.russian_sentence:
-                print(f"  Warning: Missing russian_sentence for '{word.lemma}' in sentence: {sentence_raw[:50]}...")
+                logger.warning(
+                    f"Missing russian_sentence for '{word.lemma}' in sentence: {sentence_raw[:50]}...",
+                    extra={"lemma": word.lemma, "sentence": sentence_raw[:50]}
+                )
                 continue
 
             card = VocabularyCard(
@@ -499,6 +530,6 @@ def build_vocabulary_pipeline(
             )
             cards.append(card)
 
-    print(f"Generated {len(cards)} vocabulary cards total")
+    logger.info("Generated vocabulary cards", extra={"total_cards": len(cards)})
 
     return cards

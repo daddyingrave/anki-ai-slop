@@ -633,11 +633,35 @@ async def process_all_batches_concurrent(
 
 ### Low Priority Enhancements
 
-- [ ] **Add structured logging**
-  - [ ] Replace print statements with proper logging
-  - [ ] Add log levels (DEBUG, INFO, WARNING, ERROR)
-  - [ ] Add structured fields for metrics
-  - [ ] Enable log aggregation
+- [x] **Add structured logging** ✅ COMPLETED
+  - [x] Replace print statements with proper logging
+  - [x] Add log levels (DEBUG, INFO, WARNING, ERROR)
+  - [x] Add structured fields for metrics
+  - [x] Enable log aggregation (via Python logging module)
+
+  **Implementation Summary:**
+  - Created `src/anki/common/logging_config.py` with `setup_logging()` and `get_logger()` functions
+  - Implemented `ContextFormatter` for human-readable logs with structured context fields
+  - Added `LLMPromptResponseCallback` in `observability.py` to log LLM prompts/responses at DEBUG level
+  - Replaced all `print()` statements with appropriate logging levels across:
+    - `src/anki/pipelines/vocabulary/chains.py`
+    - `src/anki/lemmatizer/lemma_extractor.py`
+    - `src/anki/anki_sync/anki_connect.py`
+    - `src/anki/__main__.py`
+    - `src/anki/common/observability.py`
+  - Added `--log-level` CLI argument to main entry point
+  - Log format: `YYYY-MM-DD HH:MM:SS [LEVEL] logger_name: message | key1=value1 key2=value2`
+  - Use `--log-level DEBUG` to see LLM prompts/responses and detailed execution flow
+  - Use `--log-level INFO` for normal operation (default)
+
+  **Example Usage:**
+  ```bash
+  # Normal operation
+  uv run python -m anki --pipeline-name vocabulary --config config.yaml
+
+  # Debug mode (see LLM prompts/responses)
+  uv run python -m anki --pipeline-name vocabulary --config config.yaml --log-level DEBUG
+  ```
 
 - [ ] **Implement few-shot prompt templates**
   - [ ] Use LangChain's `FewShotPromptTemplate`

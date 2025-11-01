@@ -31,10 +31,13 @@ from __future__ import annotations
 from dataclasses import MISSING, Field, fields as dataclass_fields, is_dataclass, field, make_dataclass
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
 import json
+import logging
 import sys
 import urllib.request
 
 from anki.anki_sync.vocabulary_improved import create_vocabulary_improved_model_payload
+
+logger = logging.getLogger(__name__)
 
 ANKI_CONNECT_VERSION = 6
 
@@ -214,10 +217,10 @@ def sync_anki_cards(
     try:
         client.invoke("version")
     except Exception as e:
-        print(
-            f"[anki-sync] WARNING: Could not connect to AnkiConnect at {anki_connect_url}: {e}. Skipping sync.\n"
+        logger.warning(
+            f"Could not connect to AnkiConnect at {anki_connect_url}: {e}. Skipping sync. "
             f"Start Anki with the AnkiConnect add-on enabled, or set ANKI_CONNECT_URL.",
-            file=sys.stderr,
+            extra={"anki_url": anki_connect_url, "error": str(e)}
         )
         result.failures.append(f"AnkiConnect unreachable at {anki_connect_url}")
         return result
@@ -265,7 +268,7 @@ def sync_anki_cards(
                     continue
             except RuntimeError as e:
                 # If search fails, log but continue to try adding
-                print(f"[anki-sync] Warning: search query failed for card #{idx+1}: {e}", file=sys.stderr)
+                logger.warning(f"Search query failed for card #{idx+1}: {e}", extra={"card_index": idx+1, "error": str(e)})
 
             # Prepare note payload
             # Convert all values to strings as Anki fields are strings
@@ -295,7 +298,7 @@ def sync_anki_cards(
 
         except Exception as e:
             msg = f"Card #{idx+1} failed: {e}"
-            print(f"[anki-sync] ERROR: {msg}", file=sys.stderr)
+            logger.error(msg, extra={"card_index": idx+1}, exc_info=e)
             result.failures.append(msg)
 
     return result
