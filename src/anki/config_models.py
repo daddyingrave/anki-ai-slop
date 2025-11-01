@@ -9,6 +9,17 @@ from pydantic import BaseModel, Field
 class StepConfig(BaseModel):
     model: str = Field(..., description="Model name for this step")
     temperature: float = Field(..., description="Sampling temperature for this step")
+    thinking_budget: int | None = Field(
+        default=None,
+        description=(
+            "Token budget for internal reasoning (Gemini 2.5+ only). "
+            "0 = disable thinking (fastest, cheapest), "
+            "-1 = dynamic thinking (model decides), "
+            "N = specific token limit. "
+            "None = use model default. "
+            "For simple tasks like translation, 0 is recommended."
+        )
+    )
     max_retries: int = Field(default=2, ge=0, le=5, description="Max retries for this step")
     backoff_initial_seconds: float = Field(default=0.5, gt=0, description="Initial backoff delay in seconds")
     backoff_multiplier: float = Field(default=2.0, gt=1.0, description="Exponential backoff multiplier")

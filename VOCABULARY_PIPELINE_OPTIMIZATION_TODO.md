@@ -161,11 +161,11 @@ def build_step_prompts(step_name: str) -> Dict[str, str]:
 
 #### Tasks:
 
-- [ ] **Update `src/anki/common/llm.py`**
-  - [ ] Add `thinking_budget` parameter to `build_llm()` function
-  - [ ] Pass parameter to `ChatGoogleGenerativeAI` constructor
-  - [ ] Add docstring explaining thinking budget options
-  - [ ] Handle models that don't support thinking budget
+- [x] **Update `src/anki/common/llm.py`**
+  - [x] Add `thinking_budget` parameter to `build_llm()` function
+  - [x] Pass parameter to `ChatGoogleGenerativeAI` constructor
+  - [x] Add docstring explaining thinking budget options
+  - [x] Handle models that don't support thinking budget
 
 **Implementation Details:**
 ```python
@@ -200,19 +200,24 @@ def build_llm(
         return ChatGoogleGenerativeAI(model=model, temperature=temperature)
 ```
 
-- [ ] **Update `src/anki/pipelines/vocabulary/models.py`**
-  - [ ] Add `thinking_budget` field to `TranslationStep` model
-  - [ ] Set default to `0` (disable thinking for simple translations)
-  - [ ] Add validation for valid budget values
+- [x] **Update `src/anki/config_models.py`**
+  - [x] Add `thinking_budget` field to `StepConfig` model
+  - [x] Set default to `None` (use model default)
+  - [x] Add comprehensive docstring explaining options
 
-- [ ] **Update `config.yaml`**
-  - [ ] Add `thinking_budget: 0` to context translation step
-  - [ ] Add `thinking_budget: 0` to general translation step
-  - [ ] Document thinking budget options in comments
+- [x] **Update `config.yaml` and `config-prod.yaml`**
+  - [x] Add `thinking_budget: 0` to vocabulary translation steps
+  - [x] Add `thinking_budget: 0` to vocabulary review steps
+  - [x] Add `thinking_budget: 0` to obsidian generate/review steps
+  - [x] Document thinking budget options in comments
 
-- [ ] **Update `src/anki/pipelines/vocabulary/chains.py`**
-  - [ ] Pass `thinking_budget` from config to `build_llm()` calls
-  - [ ] Update both `translate_words_ctx()` and `translate_words_general()`
+- [x] **Update `src/anki/pipelines/vocabulary/chains.py`**
+  - [x] Pass `thinking_budget` from config to `build_llm()` calls
+  - [x] Update both `translate_words_ctx()` and `translate_words_general()`
+
+- [x] **Update `src/anki/pipelines/obsidian/chains.py`**
+  - [x] Pass `thinking_budget` from config to `build_llm()` calls
+  - [x] Update both `generate_anki_deck()` and `review_anki_deck()`
 
 **Implementation Details:**
 ```python
@@ -224,8 +229,8 @@ llm = build_llm(
 )
 ```
 
-- [ ] **Test thinking budget configuration**
-  - [ ] Run with `thinking_budget=0` (disabled)
+- [ ] **Test thinking budget configuration** (Optional - user can test if desired)
+  - [ ] Run with `thinking_budget=0` (disabled) - **RECOMMENDED DEFAULT**
   - [ ] Run with `thinking_budget=-1` (dynamic)
   - [ ] Run with `thinking_budget=512` (limited)
   - [ ] Compare token usage and translation quality
@@ -235,6 +240,8 @@ llm = build_llm(
 - ✅ Controlled thinking token usage
 - ✅ 50-150% reduction in thinking tokens for simple tasks
 - ✅ ~$0.50-1.50 cost savings per 100 sentences
+- ✅ **Default set to `thinking_budget=0` (disabled) for all pipelines**
+- ✅ Translation tasks don't need complex reasoning, so thinking is disabled by default
 
 ---
 

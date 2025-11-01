@@ -106,7 +106,11 @@ async def translate_words_general(
     Returns:
         Response with general translations for all words
     """
-    llm = build_llm(model=step.model, temperature=step.temperature)
+    llm = build_llm(
+        model=step.model,
+        temperature=step.temperature,
+        thinking_budget=step.thinking_budget,
+    )
 
     prompts = build_general_translation_prompts()
 
@@ -150,7 +154,11 @@ async def translate_words_ctx(
     Returns:
         Translation response with translations for all words in context
     """
-    llm = build_llm(model=step.model, temperature=step.temperature)
+    llm = build_llm(
+        model=step.model,
+        temperature=step.temperature,
+        thinking_budget=step.thinking_budget,
+    )
 
     prompts = build_ctx_translation_prompts()
 

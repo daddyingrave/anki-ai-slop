@@ -20,7 +20,11 @@ def generate_anki_deck(
         step: StepConfig,
 ) -> AnkiDeck:
     """Generate a ready-to-use Anki deck (Front/Back only) directly from the article."""
-    llm = build_llm(model=step.model, temperature=step.temperature)
+    llm = build_llm(
+        model=step.model,
+        temperature=step.temperature,
+        thinking_budget=step.thinking_budget,
+    )
 
     step_prompts = build_step("1_generate_deck")
     prompt = ChatPromptTemplate.from_messages(
@@ -52,7 +56,11 @@ def review_anki_deck(
         step: StepConfig,
 ) -> AnkiDeck:
     """Review and fix the generated Anki deck. Returns the revised deck."""
-    llm = build_llm(model=step.model, temperature=step.temperature)
+    llm = build_llm(
+        model=step.model,
+        temperature=step.temperature,
+        thinking_budget=step.thinking_budget,
+    )
 
     step_prompts = build_step("2_review_deck")
     prompt = ChatPromptTemplate.from_messages(
