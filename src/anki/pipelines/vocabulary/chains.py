@@ -168,11 +168,10 @@ async def translate_words_ctx(
         ctx = sentence_with_words.context
         if ctx.previous_sentence:
             context_info += f"Previous sentence: {ctx.previous_sentence}\n"
-        context_info += f"Current sentence: {ctx.sentence}\n"
         if ctx.next_sentence:
             context_info += f"Next sentence: {ctx.next_sentence}\n"
     else:
-        context_info = f"Sentence: {sentence_with_words.sentence}"
+        context_info = ""
 
     # Format words list
     words_list = ""

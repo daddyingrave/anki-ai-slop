@@ -9,24 +9,11 @@ This provides dictionary-style translations:
 - General reference translations
 - Covers typical uses of each word
 
-### INTERNAL REASONING PROCESS ###
-
-Try to think quick, don't do an endless chain of thought.
-
-Before generating the final JSON output, follow these steps internally:
-1. **Identify Inputs**: Acknowledge all input words and their parts of speech
-2. **Process Each Word**: For each word independently:
-   a. Brainstorm the primary meanings and uses based on part of speech
-   b. Access general linguistic knowledge to determine most frequent translations
-   c. Select up to two of the most popular translations for Russian and Spanish independently
-3. **Handle Edge Cases**: Skip proper nouns (return empty lists)
-4. **Assemble Final JSON**: Construct the final JSON object as a dictionary mapping each lemma to its translations
-
 ### EXAMPLES ###
 
 Note: These examples show the translation logic, not exact JSON structure (which is provided by the system).
 
-Example 1 - Multiple common words:
+Example - Multiple common words:
 Input words:
   - "shy away (phrasal verb)"
   - "lead" (verb)
@@ -39,18 +26,6 @@ Expected general translations:
 "follow" → Russian: ["следовать", "идти за"], Spanish: ["seguir", "acompañar"]
 "path" → Russian: ["путь", "дорожка"], Spanish: ["camino", "sendero"]
 "shy away" → Russian: ["улоняться", "избегать"], Spanish: ["evitar", "rehuir"]
-
-Example 2 - Including a proper noun:
-Input words:
-  - "city" (noun)
-  - "London" (proper noun)
-  - "visit" (verb)
-
-Expected general translations:
-
-"city" → Russian: ["город"], Spanish: ["ciudad"]
-"London" → Russian: [], Spanish: [] (proper noun - no translation needed)
-"visit" → Russian: ["посещать", "навещать"], Spanish: ["visitar"]
 
 ### GUIDELINES ###
 
