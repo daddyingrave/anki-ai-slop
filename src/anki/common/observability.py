@@ -106,8 +106,6 @@ class TokenAccumulator:
         print("=" * 70)
         print(f"Input tokens:      {totals['input_tokens']:>12,}")
         print(f"Output tokens:     {totals['output_tokens']:>12,}")
-        print(f"Cached tokens:     {totals['cached_tokens']:>12,}")
-        print(f"Reasoning tokens:  {totals['reasoning_tokens']:>12,}")
         print(f"{'─' * 70}")
         print(f"Total tokens:      {totals['total_tokens']:>12,}")
 
@@ -120,6 +118,7 @@ class TokenAccumulator:
                 output_price = float(model_pricing.get('output_token_price', 0.0))
 
                 # Calculate costs (prices are per 1M tokens)
+                # Note: All tokens are billed. LangChain cache hits don't reach the LLM at all.
                 input_cost = (totals['input_tokens'] / 1_000_000) * input_price
                 output_cost = (totals['output_tokens'] / 1_000_000) * output_price
                 total_cost = input_cost + output_cost
