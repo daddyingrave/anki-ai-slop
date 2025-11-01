@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from anki.anki_sync.anki_connect import anki_id, sync_anki_cards, AnkiConnectClient
 from anki.common.logging_config import setup_logging
-from anki.common.observability import enable_cache
+from anki.common.observability import enable_cache, TokenAccumulator
 from anki.common.tts import TTSClient, TTSVoiceConfig
 from anki.config_models import RunConfig, ObsidianPipelineConfig, VocabularyPipelineConfig
 from anki.pipelines.obsidian.chains import build_obsidian_pipeline
@@ -70,6 +70,13 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None, log_
     if not cfg.pipelines:
         raise SystemExit("Missing pipelines configuration")
 
+    # Extract pricing config for cost calculation
+    pricing_config = raw.get("model_pricing", {})
+
+    # Reset token accumulator for this pipeline run
+    accumulator = TokenAccumulator.get_instance()
+    accumulator.reset()
+
     if pipeline_name == "obsidian_to_anki":
         pipeline_cfg_raw = cfg.pipelines.get("obsidian_to_anki")
         if pipeline_cfg_raw is None:
@@ -77,6 +84,9 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None, log_
 
         # Parse raw dict to typed config
         pipeline_cfg = ObsidianPipelineConfig(**pipeline_cfg_raw)
+
+        # Set model name for cost tracking (use generate step model as primary)
+        accumulator.set_model(pipeline_cfg.generate.model)
 
         # Run the obsidian pipeline
         deck_results = build_obsidian_pipeline(
@@ -109,6 +119,9 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None, log_
 
         # Parse raw dict to typed config
         pipeline_cfg = VocabularyPipelineConfig(**pipeline_cfg_raw)
+
+        # Set model name for cost tracking (use translate step model as primary)
+        accumulator.set_model(pipeline_cfg.translate.model)
 
         input_file = Path(pipeline_cfg.input_file)
         if not input_file.exists() or not input_file.is_file():
@@ -174,6 +187,9 @@ def run_from_config(pipeline_name: str, config_path: Optional[Path] = None, log_
 
     else:
         raise SystemExit(f"Unknown pipeline: {pipeline_name}")
+
+    # Print token usage summary
+    accumulator.print_summary(pricing_config)
 
 
 if __name__ == "__main__":

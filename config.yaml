@@ -1,19 +1,25 @@
-# New configuration schema
-# Pipelines configuration
+# See: https://ai.google.dev/pricing
+model_pricing:
+  models/gemini-2.0-flash-lite:
+    input_token_price: 0.075
+    output_token_price: 0.30
+
 pipelines:
   obsidian_to_anki:
-    vault_dir: /Users/daddyingrave/Code/Personal/eat-ai-shit
-    notes_path: out/Computing Systems Elements 2nd Ed-part-3.md
+    vault_dir: /Users/daddyingrave/Documents/default
+    notes_path: Learn/Algorithms/Neetcode.io/Union-Find.md
 
     generate:
       model: models/gemini-2.0-flash-lite
       temperature: 0.4
+      thinking_budget: 0
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
     review:
       model: models/gemini-2.0-flash-lite
       temperature: 0.0
+      thinking_budget: 0
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
@@ -36,12 +42,14 @@ pipelines:
     translate:
       model: models/gemini-2.0-flash-lite
       temperature: 0.0
+      thinking_budget: 0
       max_retries: 3
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0
     review:
       model: models/gemini-2.0-flash-lite
       temperature: 0.0
+      thinking_budget: 0
       max_retries: 2
       backoff_initial_seconds: 0.5
       backoff_multiplier: 2.0

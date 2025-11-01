@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +16,131 @@ from langchain_core.outputs import ChatGeneration, LLMResult
 logger = logging.getLogger(__name__)
 
 
+# ---- Token accumulation for cost tracking ----
+@dataclass
+class TokenUsage:
+    """Thread-safe token usage accumulator."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def add(self, input_tokens: int = 0, output_tokens: int = 0,
+            cached_tokens: int = 0, reasoning_tokens: int = 0) -> None:
+        """Thread-safe token accumulation."""
+        with self._lock:
+            self.input_tokens += input_tokens
+            self.output_tokens += output_tokens
+            self.cached_tokens += cached_tokens
+            self.reasoning_tokens += reasoning_tokens
+
+    def get_totals(self) -> Dict[str, int]:
+        """Get current totals (thread-safe)."""
+        with self._lock:
+            return {
+                "input_tokens": self.input_tokens,
+                "output_tokens": self.output_tokens,
+                "cached_tokens": self.cached_tokens,
+                "reasoning_tokens": self.reasoning_tokens,
+                "total_tokens": self.input_tokens + self.output_tokens,
+            }
+
+    def reset(self) -> None:
+        """Reset all counters (thread-safe)."""
+        with self._lock:
+            self.input_tokens = 0
+            self.output_tokens = 0
+            self.cached_tokens = 0
+            self.reasoning_tokens = 0
+
+
+class TokenAccumulator:
+    """Global token accumulator for tracking usage across pipeline execution."""
+
+    _instance: Optional['TokenAccumulator'] = None
+    _lock = threading.Lock()
+
+    def __init__(self) -> None:
+        self.usage = TokenUsage()
+        self.model_name: Optional[str] = None
+
+    @classmethod
+    def get_instance(cls) -> 'TokenAccumulator':
+        """Get singleton instance (thread-safe)."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    def set_model(self, model_name: str) -> None:
+        """Set the model name for pricing lookup."""
+        self.model_name = model_name
+
+    def add_usage(self, input_tokens: int = 0, output_tokens: int = 0,
+                  cached_tokens: int = 0, reasoning_tokens: int = 0) -> None:
+        """Add token usage (thread-safe)."""
+        self.usage.add(input_tokens, output_tokens, cached_tokens, reasoning_tokens)
+
+    def get_summary(self) -> Dict[str, int]:
+        """Get usage summary."""
+        return self.usage.get_totals()
+
+    def reset(self) -> None:
+        """Reset accumulator."""
+        self.usage.reset()
+        self.model_name = None
+
+    def print_summary(self, pricing_config: Optional[Dict[str, Any]] = None) -> None:
+        """Print token usage summary with cost estimation.
+
+        Args:
+            pricing_config: Model pricing configuration from config.yaml
+                           Format: {model_name: {input_token_price: float, output_token_price: float}}
+        """
+        totals = self.get_summary()
+
+        print("\n" + "=" * 70)
+        print("TOKEN USAGE SUMMARY")
+        print("=" * 70)
+        print(f"Input tokens:      {totals['input_tokens']:>12,}")
+        print(f"Output tokens:     {totals['output_tokens']:>12,}")
+        print(f"Cached tokens:     {totals['cached_tokens']:>12,}")
+        print(f"Reasoning tokens:  {totals['reasoning_tokens']:>12,}")
+        print(f"{'─' * 70}")
+        print(f"Total tokens:      {totals['total_tokens']:>12,}")
+
+        # Calculate cost if pricing config is provided
+        if pricing_config and self.model_name:
+            model_pricing = pricing_config.get(self.model_name)
+            if model_pricing:
+                # Convert to float in case YAML loaded as string
+                input_price = float(model_pricing.get('input_token_price', 0.0))
+                output_price = float(model_pricing.get('output_token_price', 0.0))
+
+                # Calculate costs (prices are per 1M tokens)
+                input_cost = (totals['input_tokens'] / 1_000_000) * input_price
+                output_cost = (totals['output_tokens'] / 1_000_000) * output_price
+                total_cost = input_cost + output_cost
+
+                print(f"\n{'─' * 70}")
+                print(f"ESTIMATED COST (Model: {self.model_name})")
+                print(f"{'─' * 70}")
+                print(f"Input cost:        ${input_cost:>12.6f}  (${input_price}/1M tokens)")
+                print(f"Output cost:       ${output_cost:>12.6f}  (${output_price}/1M tokens)")
+                print(f"{'─' * 70}")
+                print(f"Total cost:        ${total_cost:>12.6f}")
+            else:
+                print(f"\n⚠️  No pricing configured for model: {self.model_name}")
+        elif not pricing_config:
+            print(f"\n⚠️  No pricing configuration provided")
+        elif not self.model_name:
+            print(f"\n⚠️  Model name not set")
+
+        print("=" * 70 + "\n")
+
+
 def enable_cache(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     set_llm_cache(SQLiteCache(database_path=str(db_path)))
@@ -22,7 +149,7 @@ def enable_cache(db_path: Path) -> None:
 
 # ---- Enhanced Gemini token usage logging via LangChain callback ----
 class GeminiTokenUsageCallback(BaseCallbackHandler):
-    """Log token usage for Gemini models.
+    """Log token usage for Gemini models and accumulate totals.
 
     Tracks token counts from LangChain's usage_metadata:
     - input_tokens: Prompt tokens
@@ -31,10 +158,21 @@ class GeminiTokenUsageCallback(BaseCallbackHandler):
     - input_token_details.cache_read: Tokens read from cache
     - output_token_details.reasoning: Reasoning/thinking tokens (Gemini 2.5+)
 
-    Also calculates:
-    - Estimated API costs based on Gemini Flash pricing
-    - Cache efficiency when cache_read > 0
+    Also:
+    - Accumulates tokens in global TokenAccumulator for cost tracking
+    - Logs individual LLM call usage
     """
+
+    def __init__(self, accumulate: bool = True) -> None:
+        """Initialize callback.
+
+        Args:
+            accumulate: Whether to accumulate tokens in global TokenAccumulator (default: True)
+        """
+        super().__init__()
+        self.accumulate = accumulate
+        if accumulate:
+            self.accumulator = TokenAccumulator.get_instance()
 
     def _extract_usage_metadata(self, response: LLMResult) -> Optional[Dict[str, Any]]:
         """Extract usage_metadata from LLMResult response.
@@ -90,6 +228,15 @@ class GeminiTokenUsageCallback(BaseCallbackHandler):
             output_details = usage.get("output_token_details")
             if isinstance(output_details, dict):
                 reasoning_tokens = output_details.get("reasoning")
+
+            # Accumulate tokens in global accumulator
+            if self.accumulate and in_tokens is not None and out_tokens is not None:
+                self.accumulator.add_usage(
+                    input_tokens=in_tokens,
+                    output_tokens=out_tokens,
+                    cached_tokens=cache_read_tokens or 0,
+                    reasoning_tokens=reasoning_tokens or 0,
+                )
 
             # Log token usage with structured fields only (no redundant message)
             logger.info(
