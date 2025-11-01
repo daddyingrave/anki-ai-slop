@@ -141,6 +141,40 @@ async def translate_words_general(
     return result
 
 
+def should_include_context(sentence: str, words: List[WordInSentence]) -> bool:
+    """Determine if previous/next sentences are needed for translation.
+
+    Include context if:
+    - Sentence has phrasal verbs (need context for meaning)
+    - Contains pronouns without clear antecedents
+    - Is very short (< 5 words, likely needs context)
+
+    Args:
+        sentence: The sentence text
+        words: List of words to translate in the sentence
+
+    Returns:
+        True if full context should be included, False otherwise
+    """
+    # Check for phrasal verbs
+    has_phrasal_verbs = any(w.is_phrasal_verb for w in words)
+    if has_phrasal_verbs:
+        return True
+
+    # Check for pronouns
+    has_pronouns = any(w.part_of_speech == "pronoun" for w in words)
+
+    # Check sentence length
+    word_count = len(sentence.split())
+    is_short = word_count < 5
+
+    # Include context for short sentences with pronouns
+    if has_pronouns and is_short:
+        return True
+
+    return False
+
+
 async def translate_words_ctx(
         sentence_with_words: SentenceWithWords,
         step: StepConfig,
@@ -162,16 +196,17 @@ async def translate_words_ctx(
 
     prompts = build_ctx_translation_prompts()
 
-    # Format context info
     context_info = ""
-    if sentence_with_words.context:
+    if sentence_with_words.context and should_include_context(
+            sentence_with_words.sentence,
+            sentence_with_words.words
+    ):
+        # Include full context only when needed
         ctx = sentence_with_words.context
         if ctx.previous_sentence:
             context_info += f"Previous sentence: {ctx.previous_sentence}\n"
         if ctx.next_sentence:
             context_info += f"Next sentence: {ctx.next_sentence}\n"
-    else:
-        context_info = ""
 
     # Format words list
     words_list = ""
