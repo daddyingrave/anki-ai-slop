@@ -5,11 +5,11 @@ description = "AI utilites to simplifiy some anki interactions"
 requires-python = ">=3.13"
 dependencies = [
     "hatchling>=1.18",
-    "langchain==0.3.27",
-    "langchain-community==0.3.30",
-    "langchain-google-genai==2.1.12",
+    "langchain==1.0.3",
+    "langchain-community==0.4.1",
+    "langchain-google-genai==3.0.0",
     "google-cloud-texttospeech>=2.31.0",
-    "pydantic==2.11.10",
+    "pydantic==2.12.3",
     "pyyaml==6.0.3",
     "Pillow>=10.0.0",
     "mistralai>=1.0.0",
