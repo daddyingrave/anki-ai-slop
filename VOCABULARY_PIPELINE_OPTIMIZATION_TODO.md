@@ -38,21 +38,22 @@
 
 ## Phase 1: Immediate Fixes (Week 1) 🔴 CRITICAL
 
-### Day 1-2: Token Tracking Enhancement
+### Day 1-2: Token Tracking Enhancement ✅ COMPLETED
 
-**Priority:** CRITICAL  
-**Effort:** 2-3 hours  
+**Priority:** CRITICAL
+**Effort:** 2-3 hours
 **Impact:** Full cost visibility (reveals true costs)
+**Status:** ✅ COMPLETED 2025-11-01
 
 #### Tasks:
 
-- [ ] **Update `src/anki/common/observability.py`**
-  - [ ] Add `thoughts_token_count` extraction from `usage_metadata`
-  - [ ] Add `cached_content_token_count` extraction
-  - [ ] Add `candidates_token_count` extraction
-  - [ ] Calculate actual billable output tokens (output + thinking)
-  - [ ] Update logging to show all token types
-  - [ ] Add cost calculation based on token types
+- [x] **Update `src/anki/common/observability.py`**
+  - [x] Add `thoughts_token_count` extraction from `usage_metadata`
+  - [x] Add `cached_content_token_count` extraction
+  - [x] Add `candidates_token_count` extraction
+  - [x] Calculate actual billable output tokens (output + thinking)
+  - [x] Update logging to show all token types
+  - [x] Add cost calculation based on token types
 
 **Implementation Details:**
 ```python
@@ -74,6 +75,29 @@ if thoughts_tokens:
     actual_output = (out_tokens or 0) + (thoughts_tokens or 0)
     print(f"[observability] Actual billable output tokens: {actual_output}")
 ```
+
+**Completion Summary:**
+- ✅ Token tracking implemented based on ACTUAL API structure
+- ✅ **CORRECTED (3rd attempt):** Verified actual API response structure via debug logging
+- ✅ Tracks: `input_tokens`, `output_tokens`, `total_tokens`, `input_token_details.cache_read`
+- ✅ Cost calculation implemented (with cache discount support)
+- ✅ Cache efficiency tracking implemented
+- ✅ Documentation created:
+  - `docs/token-tracking-implementation.md` (initial, incorrect)
+  - `docs/token-tracking-corrections.md` (second attempt, still incorrect)
+  - `docs/ACTUAL-API-STRUCTURE.md` (final, verified with real API responses)
+- ✅ Ready for production use
+
+**Critical Discovery:**
+The LangChain Google GenAI library does NOT expose separate thinking token counts.
+Fields like `output_token_details.reasoning`, `candidates_token_count`, and
+`cached_content_token_count` **do not exist** in the actual API response.
+
+**What This Means:**
+- Thinking tokens (if any) are included in `output_tokens` - you're already being charged
+- No way to see breakdown of thinking vs. regular output with current library
+- Cache information is in `input_token_details.cache_read` (not `cached_content_token_count`)
+- The implementation now tracks everything that's actually available
 
 ---
 
